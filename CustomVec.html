@@ -1,0 +1,99 @@
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+  <meta charset="utf-8">
+  <meta name="generator" content="pandoc">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Marching Cubes devlog</title>
+  <link rel="stylesheet" href="styles/reset.css">
+  <link rel="stylesheet" href="styles/index.css">
+  <link rel="stylesheet" href="styles/hljs/github-dark.min.css">
+</head>
+<body>
+<table class="header">
+  <tbody><tr>
+    <td rowspan="2" class="width-auto">
+      <h1 class="title">Marching Cubes devlog</h1>
+      <span class="subtitle">Custom vector class</span>
+    </td>
+	<td>
+		<a href="index">Main page</a>
+	</td>
+  </tr>
+  <tr>
+    <td class="width-min">
+		<span style="white-space: pre;">Updated: 9/2024</span>
+	</td>
+  </tr>
+</tbody></table>
+<label class="debug-toggle-label"><input type="checkbox" class="debug-toggle"> Debug mode</label>
+<nav id="TOC" role="doc-toc">
+<!-- <h2 id="toc-title">Contents</h2>
+ -->
+<ul>
+<li><a href="#c-me">C++ &amp; me</a></li>
+<li><a href="#the-custom-vector">The custom vector</a></li>
+</ul>
+</nav>
+<h2 id="c-me">C++ &amp; me</h2>
+<p>When doing things that are performance focused, the way C++ always
+deep copies things by default makes me want to stop using it entirely.
+Sure I could overload all the 50 different operators, but why if my
+struct is so simple and sexy?</p>
+<p>I needed a fast way of appending data from one vector onto another.
+Copying objects is usually:</p>
+<ul>
+<li>done in a loop</li>
+<li>calling copy/move/destruct</li>
+<li>too slow</li>
+</ul>
+<p>So, I needed to memcpy() things, especially to avoid the destructor,
+since most of my structs are meant to stay in the same place and never
+move around. I got really tired of using std::vector for this, so I
+decided to make my own vector class.</p>
+<h2 id="the-custom-vector">The custom vector</h2>
+<p>Starting simple, the vector should have:</p>
+<ul>
+<li>pointer to the data (array / data)</li>
+<li>number of elements in the array (size)</li>
+<li>capacity of the array, to ensure I don’t overflow it (capacity)</li>
+</ul>
+<p>When inserting an element, if the max capacity is reached, I just
+realloc the entire array to 2x its capacity. So far so good, nice and
+simple. To optimize inserts, I should also make an emplace_back
+function, like the STL containers have. But how?</p>
+<p>Before going into it I already knew something cursed was coming up.
+After looking at some examples, I found a simple solution:</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp"><span class="hljs-keyword">template</span> &lt;<span class="hljs-keyword">typename</span>... Args&gt;
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">emplace_back</span><span class="hljs-params">(Args&amp;&amp;... args)</span> </span>{
+    <span class="hljs-keyword">if</span> (_sp == _capacity) { <span class="hljs-comment">// not enough space, grow</span>
+        <span class="hljs-built_in">grow</span>();
+    }
+
+    <span class="hljs-comment">// construct the object</span>
+    _data[_sp] = <span class="hljs-built_in">T</span>(std::forward&lt;Args&gt;(args)...);
+
+    <span class="hljs-comment">// grow the size (sp stands for stack pointer here)</span>
+    _sp ++;
+}</code></pre>
+<p>While at first this seems to do what I want, it actually also causes
+a lot of pain for the user. You see, the object is not just getting
+constructed, but also copied/moved/destroyed/whatever, as operator= gets
+called. But how do I fix this? You guessed it, even more cursed
+code.</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp">    <span class="hljs-comment">// WRONG</span>
+    _data[_sp] = <span class="hljs-built_in">T</span>(std::forward&lt;Args&gt;(args)...);
+
+    <span class="hljs-comment">// CORRECT</span>
+    <span class="hljs-keyword">new</span> (_data + _sp) <span class="hljs-built_in">T</span>(std::forward&lt;Args&gt;(args)...);</code></pre>
+<p>Here, the object is constructed at the memory pointed to by
+<code>_data + _sp</code> (&amp;_data[_sp]). My first reaction was
+WHAT???????? WHY????????, but over time I have come to accept C++ is a
+difficult language that does difficult things, and cursed code is
+usually required if I want to do very specific things. But it still just
+looks wrong.</p>
+  <div class="debug-grid"></div>
+  <script src="index.js"></script>
+
+<footer>
+</footer>
+
+</body></html>

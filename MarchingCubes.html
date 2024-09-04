@@ -1,0 +1,131 @@
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+  <meta charset="utf-8">
+  <meta name="generator" content="pandoc">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Marching Cubes devlog</title>
+  <link rel="stylesheet" href="styles/reset.css">
+  <link rel="stylesheet" href="styles/index.css">
+  <link rel="stylesheet" href="styles/hljs/github-dark.min.css">
+</head>
+<body>
+<table class="header">
+  <tbody><tr>
+    <td rowspan="2" class="width-auto">
+      <h1 class="title">Marching Cubes devlog</h1>
+      <span class="subtitle">Marching Cubes</span>
+    </td>
+	<td>
+		<a href="index">Main page</a>
+	</td>
+  </tr>
+  <tr>
+    <td class="width-min">
+		<span style="white-space: pre;">Updated: 8/2024</span>
+	</td>
+  </tr>
+</tbody></table>
+<label class="debug-toggle-label"><input type="checkbox" class="debug-toggle"> Debug mode</label>
+<nav id="TOC" role="doc-toc">
+<!-- <h2 id="toc-title">Contents</h2>
+ -->
+<ul>
+<li><a href="#the-algorithm">The algorithm</a></li>
+<li><a href="#my-version">My version</a></li>
+</ul>
+</nav>
+<h2 id="the-algorithm">The algorithm</h2>
+<p>This is a very basic overview:</p>
+<p>The marching cubes algorithm was created for applications like
+medical imaging, where a machine returns a 3D grid of densities and you
+somehow have to turn them into triangles to be rendered.</p>
+<p>From the 3D grid, you can imagine each 2x2x2 points as being the
+corners of a cube (just turn a grid into cubes). Then, given a threshold
+like 10.0, if the value of the density at some corner is above this
+threshold, you will use this corner to create triangles. For example, in
+an MRI, changing this threshold allows you to separate muscle from bones
+(not 100% true, but you get the idea).</p>
+<p>When a corner is considered ‘active’, by being above the threshold,
+it is set to 1. As a cube has 8 corners, you can nicely put this into a
+byte, like 00110001, to separate active corners from inactive ones.</p>
+<p>A certain configuration of 0s and 1s will originate certain
+triangles, and you get them from a precomputed lookup table. Then,
+according to the density value, these can be shifted by linear
+interpolation, to better approach the shape defined by the
+densities.</p>
+<p>For a more complete explanation, see something like <a href="https://paulbourke.net/geometry/polygonise/">this</a>.</p>
+<h2 id="my-version">My version</h2>
+<p>I found many people recommending dual contouring instead of marching
+cubes, as the linear interpolation would often cause holes in the
+geometry. I also did not find any good code examples, and linear
+interpolation is hard. So, I decided not to use it, and have blocky
+geometry on purpose.</p>
+<p>Then, a eureka hit me. Cubes only have 256 configurations, and if
+instead of corners I concern myself with the 12 edges (the algorithm
+uses the midpoint of the edges as the vertices for the triangles), this
+still leaves me with at most <code>12^3 = 1728</code> combinations.</p>
+<p>Long story short, I can still use the indirect rendering techniques
+from my voxel engine here. Instead of instancing quads, I only instance
+triangles. If the triangle knows its 3 edges, it can also get its normal
+from some lookup table, I don’t even have to send it to the GPU at
+all.</p>
+<p>So, I made some lookup tables, for example using
+<code>normals[edgeA][edgeB][edgeC]</code> to give me the normal of a
+triangle that uses these 3 edges.</p>
+<p>As an initial version, this is what each triangle contains when sent
+to the GPU:</p>
+<pre class="js"><code data-highlighted="yes" class="hljs language-javascript"><span class="hljs-number">32</span> bits {
+    <span class="hljs-number">5</span> bits - pos x
+    <span class="hljs-number">5</span> bits - pos y
+    <span class="hljs-number">5</span> bits - pos z
+    <span class="hljs-number">4</span> bits - edge A
+    <span class="hljs-number">4</span> bits - edge B
+    <span class="hljs-number">4</span> bits - edge C
+    <span class="hljs-number">5</span> bits - material
+}</code></pre>
+<p>where <code>pos</code> is the relative position within the chunk,
+<code>edge</code> is the ID (0-11) of the edge, and material is the ID
+of the material. With this, the shader can use indirect rendering to get
+the chunk position, and the edges to get the normal of the triangle,
+without it ever being sent. I will not explain indirect rendering, see
+the videos I mentioned on the index.</p>
+<p>Early results:</p>
+<!-- <form class="grid">
+    <img src="Pictures/mc1.png"/>
+    <img src="Pictures/mc2.png"/>
+</form>
+<form class="grid">
+    <img src="Pictures/mc3.png"/>
+    <img src="Pictures/mc4.png"/>
+</form>
+
+<table>
+<tbody>
+  <tr>
+    <td><img src="Pictures/mc1.png"/></td>
+    <td><img src="Pictures/mc2.png"/></td>
+  </tr>
+  <tr>
+    <td><img src="Pictures/mc3.png"/></td>
+    <td><img src="Pictures/mc4.png"/></td>
+  </tr>
+</tbody>
+</table>
+
+<table>
+<tbody>
+  <tr>
+    <td><img src="Pictures/mc1.png"/></td>
+  </tr>
+</tbody>
+</table> -->
+<p><img class="border" src="Pictures/mc1.png">
+<img class="border" src="Pictures/mc2.png">
+<img class="border" src="Pictures/mc3.png">
+<img class="border" src="Pictures/mc4.png"></p>
+  <div class="debug-grid"></div>
+  <script src="index.js"></script>
+
+<footer>
+</footer>
+
+</body></html>

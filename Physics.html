@@ -1,0 +1,342 @@
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+  <meta charset="utf-8">
+  <meta name="generator" content="pandoc">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Marching Cubes devlog</title>
+  <link rel="stylesheet" href="styles/reset.css">
+  <link rel="stylesheet" href="styles/index.css">
+  <link rel="stylesheet" href="styles/hljs/github-dark.min.css">
+</head>
+<body>
+<table class="header">
+  <tbody><tr>
+    <td rowspan="2" class="width-auto">
+      <h1 class="title">Marching Cubes devlog</h1>
+      <span class="subtitle">Physics</span>
+    </td>
+	<td>
+		<a href="index">Main page</a>
+	</td>
+  </tr>
+  <tr>
+    <td class="width-min">
+		<span style="white-space: pre;">Updated: 9/2024</span>
+	</td>
+  </tr>
+</tbody></table>
+<label class="debug-toggle-label"><input type="checkbox" class="debug-toggle"> Debug mode</label>
+<nav id="TOC" role="doc-toc">
+<!--  -->
+<ul>
+<li><a href="#making-it-myself">Making it myself</a></li>
+<li><a href="#not-making-it-myself---jolt-physics">Not making it myself
+- Jolt Physics</a></li>
+<li><a href="#implementing-collisions-with-the-terrain">Implementing
+collisions with the terrain</a>
+<ul>
+<li><a href="#result-of-chunk-physics-mesh">Result of chunk physics
+mesh</a></li>
+</ul></li>
+<li><a href="#entity-physics">Entity physics</a></li>
+<li><a href="#loading-hitboxes">Loading hitboxes</a>
+<ul>
+<li><a href="#result-of-entities-having-physics">Result of entities
+having physics</a></li>
+</ul></li>
+<li><a href="#physics-rendering">Physics rendering</a>
+<ul>
+<li><a href="#result-of-debug-rendering">Result of debug
+rendering</a></li>
+</ul></li>
+</ul>
+</nav>
+<h2 id="making-it-myself">Making it myself</h2>
+<p>Obviously I need physics for my game engine. Since I’m doing
+everything on my own, I can make this too. I’ve always found physics
+pretty interesting and I know a lot about it, so why not?</p>
+<p>I started by getting the deltatime of every frame, just like I did in
+my <a href="https://github.com/IVSOP/Particles">Particle simulator</a>,
+which also uses physics. Then, I added some basic gravity to the
+acceleration:</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp">accel += glm::<span class="hljs-built_in">vec3</span>(<span class="hljs-number">0.0f</span>, <span class="hljs-number">-9.8f</span>, <span class="hljs-number">0.0f</span>) * deltaTime;</code></pre>
+<p>As well as adding some acceleration depending on the key pressed, to
+enable movement.</p>
+<p>At the end, acceleration was applied by simply doing</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp">vel += accel * deltatime;
+accel = glm::<span class="hljs-built_in">vec3</span>(<span class="hljs-number">0.0f</span>);
+
+pos += vel;</code></pre>
+<p>This worked to make the player move and fall. I then added a check
+for voxels below the player, setting vertical velocity and acceleration
+to 0 to prevent falling through the ground. Early results:</p>
+<video class="border" src="Videos/phys1.mp4" controls="">
+</video>
+<video class="border" src="Videos/phys2.mp4" controls="">
+</video>
+<p>Then, I decided I needed friction when the player was on the ground.
+This was much harder than I thought, and I ended up making a jumbled
+mess of forces, accelerations and velocities, to in the end not even use
+forces at all and just to</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp">vel -= (vel * friction_coeff) * deltatime;</code></pre>
+<p>I then wanted to add actual colisions with the terrain, and this is
+where everything fell apart. Where do I even begin? How do I know the
+player is touching the ground? When he is at a distance of 0.1 to it? or
+0.05? How do I get this distance? After much consideration I discovered
+there is A LOT to a physics engine, especially a 3D one, and I should
+just use an already existing one.</p>
+<h2 id="not-making-it-myself---jolt-physics">Not making it myself - Jolt
+Physics</h2>
+<p>The most well known ones are either paid, closed source, or both. I
+knew NVIDIA PhysX was a thing, so I tried to look into it, but it didn’t
+look clean, fast, easy to use or closs platform/hardware. Ease of use
+was a big deal, I didn’t even know if I was free to use it in my game,
+or where I could get the code/binaries. As a complete beginner with no
+idea of anything, it was a scary mess.</p>
+<p>After some digging, I found some people saying great things about <a href="https://github.com/jrouwe/JoltPhysics">Jolt Physics</a>. It was
+used by Horizon Forbidden West, and was MIT licensed, so everything
+looked good.</p>
+<p>After looking at the examples, I not very quickly made the setup for
+the physics system, with no physics actually happening. The learning
+process was a bit of a pain. There is a lot of documentation, and the
+code itself (mainly the headers, which is what I am concerned with) is
+very readable, but… where do I even start to make physics things hapen?
+There were many concepts I just did not know, and I quickly realized
+this was not exactly meant for complete beginners.</p>
+<p>After having gone through lots of growing pains, I will digest most
+of these concepts just for you:</p>
+<ul>
+<li>A body is a body. You know what a body is. It has a shape, position,
+rotation, etc</li>
+<li>The layers system is so you can have some objects only collide with
+certain other objects depending on their layer</li>
+<li>There are ShapeSettings and Shapes. ShapeSettings contain more
+information, and can be serialized, while Shapes are optimized for
+runtime</li>
+<li>For NPCs, you want a Character. For the player, probably a
+CharacterVirtual</li>
+<li>A force is different than an impulse. You can also manually add to
+the velocity of a body.</li>
+<li>There are MANY shapes. Box, sphere, …, and some special ones like
+TranslatedRotatedShape, CompoundShape (made of many shapes), MeshShape
+(made out of a bunch of triangles), …</li>
+<li>ConvexHullBuilder can take a bunch of triangles and make a convex
+shape out of them</li>
+</ul>
+<p>I know these are vague, but if you know what you want to do, the docs
+are pretty good. Read them.</p>
+<p>And even some notes about its architecture:</p>
+<ul>
+<li>Pointers. Lots of pointers, everywhere, due to its hierarchical
+arquitecture. Expect segfaults when you do something wrong.</li>
+<li>Ref counting. I hate them, but I have to work with them, since jolt
+physics uses them everywhere.</li>
+<li>There are a lot of things to help you, the engine is purpose-built
+for games. You can get AABBs, transforms, …</li>
+<li>The docs feel great now, but not as a total beginner. You have to
+fight through the learning pains, as you need to learn the concepts of
+jolt physics. Starting is the hardest part by far.</li>
+<li>You cannot have a mesh shape be empty, or have an empty body. I
+really tried</li>
+</ul>
+<p>I will expand these as I learn more, or as I remember more things to
+add.</p>
+<h2 id="implementing-collisions-with-the-terrain">Implementing
+collisions with the terrain</h2>
+<p>After much segfaulting, I figured what I need is for each chunk to
+have a body, and its shape should be a MeshShape corresponding to the
+triangles of the terrain. For now, whenever the terrain gets updated, I
+have to completely rebuild the physics mesh, but whatever.</p>
+<p>You don’t even need a code example for this. Just create triangle,
+push into array, and make a shape out of it. Anyway, making shapes can
+be confusing so here is an example that works:</p>
+<p>Note that this is not perfect, and raises many questions. Shape vs
+ShapeSettings? What is SetEmbedded()??? This code worked so I just left
+it as is. Here is a simpler example of making a shape that is more
+complex, a CompoundShape:</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp">JPH::Ref&lt;JPH::StaticCompoundShapeSettings&gt; compound_shape = <span class="hljs-keyword">new</span> JPH::StaticCompoundShapeSettings;
+
+<span class="hljs-comment">// add a box</span>
+JPH::Vec3 position_box = ...;
+JPH::Quat rotation_box = ...;
+JPH::Vec3 scale_box = ...;
+
+compound_shape-&gt;<span class="hljs-built_in">AddShape</span>(
+    position_box,
+    rotation_box,
+    <span class="hljs-keyword">new</span> <span class="hljs-built_in">BoxShape</span>(scale_box)
+);
+
+<span class="hljs-comment">// add a sphere</span>
+<span class="hljs-type">float</span> height_cylinder = ...;
+<span class="hljs-type">float</span> radius_cylinder = ...;
+JPH::Vec3 position_cylinder = ...;
+JPH::Quat rotation_cylinder = ...;
+
+compound_shape-&gt;<span class="hljs-built_in">AddShape</span>(
+    position_cylinder,
+    rotation_cylinder,
+    <span class="hljs-keyword">new</span> <span class="hljs-built_in">CylinderShape</span>(height_cylinder, radius_cylinder)
+);
+
+
+ShapeSettings::ShapeResult shapeResult = compound_shape-&gt;<span class="hljs-built_in">Create</span>();
+
+<span class="hljs-comment">// final reference to the actual shape</span>
+Ref&lt;JPH::Shape&gt; res = shapeResult.<span class="hljs-built_in">Get</span>();
+</code></pre>
+<p>I will also give you a quick example of creating a body, given a
+shape:</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp"><span class="hljs-function">JPH::Body *<span class="hljs-title">createBodyFromShape</span><span class="hljs-params">(JPH::RefConst&lt;JPH::Shape&gt; shape, <span class="hljs-type">const</span> JPH::Vec3 &amp;translation, <span class="hljs-type">const</span> JPH::Quat &amp;rotation)</span> </span>{
+    <span class="hljs-function">BodyCreationSettings <span class="hljs-title">bodySettings</span><span class="hljs-params">(shape, translation, rotation, EMotionType::Dynamic, Layers::MOVING)</span></span>;
+    BodyInterface &amp;bodyInterface = <span class="hljs-built_in">getBodyInterface</span>();
+    Body* body = bodyInterface.<span class="hljs-built_in">CreateBody</span>(bodySettings);
+    bodyInterface.<span class="hljs-built_in">AddBody</span>(body-&gt;<span class="hljs-built_in">GetID</span>(), EActivation::DontActivate);
+    <span class="hljs-keyword">return</span> body;
+}</code></pre>
+<p>Anyway, there are lots of examples you can follow in the code and the
+docs.</p>
+<h3 id="result-of-chunk-physics-mesh">Result of chunk physics mesh</h3>
+<video class="border" src="Videos/phys3.mp4" controls="">
+</video>
+<h2 id="entity-physics">Entity physics</h2>
+<p>All you have to do is make one body per entity, make it dynamic and
+in the right layer, and activate it. Gravity is applied automatically,
+and to render, you can get the transform matrix straight out of the body
+using body-&gt;GetWorldTransform(). However this gives you a
+JPH::RMat44. I didn’t have the patience to see what this format was vs
+the glm::mat4, so here is a dirty manual conversion:</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp">JPH::RVec3 position = body-&gt;<span class="hljs-built_in">GetPosition</span>();
+JPH::Quat rotation = body-&gt;<span class="hljs-built_in">GetRotation</span>();
+
+glm::mat4 translationMatrix = glm::<span class="hljs-built_in">translate</span>(glm::<span class="hljs-built_in">mat4</span>(<span class="hljs-number">1.0f</span>), glm::<span class="hljs-built_in">vec3</span>(position.<span class="hljs-built_in">GetX</span>(), position.<span class="hljs-built_in">GetY</span>(), position.<span class="hljs-built_in">GetZ</span>()));
+<span class="hljs-comment">// use glm::rotate instead???</span>
+<span class="hljs-function">glm::quat <span class="hljs-title">glmQuat</span><span class="hljs-params">(rotation.GetW(), rotation.GetX(), rotation.GetY(), rotation.GetZ())</span></span>;
+glm::mat4 rotationMatrix = glm::<span class="hljs-built_in">toMat4</span>(glmQuat);</code></pre>
+<h2 id="loading-hitboxes">Loading hitboxes</h2>
+<p>Like I said somewhere in another post, I use assimp to load my
+models. How am I going to load the hitbox? I need to make shapes, like
+shperes, boxes, etc, and assimp can’t really do that. Since I have a
+finite lifespan and loading is done only once, I decided to go the dirty
+route. I don’t have time to make my own hitbox editor, so I just made it
+into a json file. This is the file for the cone monkey:</p>
+<pre class="json"><code data-highlighted="yes" class="hljs language-json"><span class="hljs-punctuation">[</span>
+    <span class="hljs-punctuation">{</span>
+        <span class="hljs-attr">"type"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"cylinder"</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">"position"</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+            <span class="hljs-number">0.0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">1.71581</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0.0</span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">"rotation"</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+            <span class="hljs-number">0.0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0.0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0.707107</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0.707107</span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">"radius"</span><span class="hljs-punctuation">:</span> <span class="hljs-number">7.5552</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">"height"</span><span class="hljs-punctuation">:</span> <span class="hljs-number">8.59692</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-punctuation">{</span>
+        <span class="hljs-attr">"type"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"box"</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">"position"</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+            <span class="hljs-number">-10.8345</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">2.46158</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">-3.56768</span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">"rotation"</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+            <span class="hljs-number">0.0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">-0.241777</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0.0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0.970332</span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">"scale"</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+            <span class="hljs-number">2.62507</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">2.25182</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">1.3427</span>
+        <span class="hljs-punctuation">]</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-punctuation">{</span>
+        <span class="hljs-attr">"type"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"box"</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">"position"</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+            <span class="hljs-number">10.8345</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">2.46158</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">-3.56768</span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">"rotation"</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+            <span class="hljs-number">0.0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0.241777</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0.0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0.970332</span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">"scale"</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+            <span class="hljs-number">2.62507</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">2.25182</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">1.3427</span>
+        <span class="hljs-punctuation">]</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-punctuation">{</span>
+        <span class="hljs-attr">"type"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"box"</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">"position"</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+            <span class="hljs-number">0.0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">-5.09679</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">5.67721</span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">"rotation"</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+            <span class="hljs-number">0.0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0.0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">0.0</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">1.0</span>
+        <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+        <span class="hljs-attr">"scale"</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+            <span class="hljs-number">3.58595</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">4.27682</span><span class="hljs-punctuation">,</span>
+            <span class="hljs-number">2.2315</span>
+        <span class="hljs-punctuation">]</span>
+    <span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">]</span></code></pre>
+<p>And here is it visualized:</p>
+<p><img class="border" src="Pictures/cone-monkey-hitbox.png"></p>
+<p>I also made it so that if a json file is not provided, I just make a
+convex hull of the entire mesh, and it worked fine.</p>
+<p>If you do something like this, keep in mind extracting these from
+blender will cause you great pain as you will inevitably forget blender
+is y-up and you might do quats like xyzw while it does wxyz. To debug
+this, see the next topic</p>
+<h3 id="result-of-entities-having-physics">Result of entities having
+physics</h3>
+<p>(segfaulted, later found out mesh vs mesh collision doesn’t work)
+<video class="border" src="Videos/phys_entity_1.mp4" controls="">
+</video>
+<video class="border" src="Videos/phys_entity_2.mp4" controls="">
+</video></p>
+<h2 id="physics-rendering">Physics rendering</h2>
+<p>Jolt provides ways of rendering the physics objects for debug
+purposes. It actually proposes you implement a pretty complete
+interface, enabling shadows and LODs. I do not have the patience for
+this, and just used DebugRendererSimple. In the source code you have an
+example of how you should use it, it is very hidden and actually pretty
+hard to find it, so you’re welcome.</p>
+<p>The bare minimum you have to do is implement</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;Jolt/Renderer/DebugRendererSimple.h&gt;</span></span>
+
+...
+
+<span class="hljs-function"><span class="hljs-keyword">virtual</span> <span class="hljs-type">void</span> <span class="hljs-title">DrawTriangle</span><span class="hljs-params">(JPH::RVec3Arg inV1, JPH::RVec3Arg inV2, JPH::RVec3Arg inV3, JPH::ColorArg inColor, ECastShadow inCastShadow)</span> <span class="hljs-keyword">override</span></span>;</code></pre>
+<p>and draw all the triangles however you want. Your renderer needs to
+be registered with</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp">DebugRenderer::sInstance = pointer_to_your_renderer;</code></pre>
+<p>And you need to call</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp">JPH::BodyManager::DrawSettings settings = JPH::BodyManager::<span class="hljs-built_in">DrawSettings</span>();
+Phys::<span class="hljs-built_in">getPhysSystem</span>()-&gt;<span class="hljs-built_in">DrawBodies</span>(settings, Phys::<span class="hljs-built_in">getPhysRenderer</span>());</code></pre>
+<p>For jolt to generate your vertices. There are also many settings but
+I use none of them.</p>
+<h3 id="result-of-debug-rendering">Result of debug rendering</h3>
+<video class="border" src="Videos/phys_debug_1.mp4" controls="">
+</video>
+  <div class="debug-grid"></div>
+  <script src="index.js"></script>
+
+<footer>
+</footer>
+
+</body></html>

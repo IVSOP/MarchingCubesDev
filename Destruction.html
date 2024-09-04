@@ -1,0 +1,321 @@
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+  <meta charset="utf-8">
+  <meta name="generator" content="pandoc">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Marching Cubes devlog</title>
+  <link rel="stylesheet" href="styles/reset.css">
+  <link rel="stylesheet" href="styles/index.css">
+  <link rel="stylesheet" href="styles/hljs/github-dark.min.css">
+</head>
+<body>
+<table class="header">
+  <tbody><tr>
+    <td rowspan="2" class="width-auto">
+      <h1 class="title">Marching Cubes devlog</h1>
+      <span class="subtitle">Physics</span>
+    </td>
+	<td>
+		<a href="index">Main page</a>
+	</td>
+  </tr>
+  <tr>
+    <td class="width-min">
+		<span style="white-space: pre;">Updated: 9/2024</span>
+	</td>
+  </tr>
+</tbody></table>
+<label class="debug-toggle-label"><input type="checkbox" class="debug-toggle"> Debug mode</label>
+<nav id="TOC" role="doc-toc">
+<!--  -->
+<ul>
+<li><a href="#ray-casting-to-click-voxels">Ray casting to click
+voxels</a></li>
+<li><a href="#applying-this-to-marching-cubes-geometry">Applying this to
+marching cubes geometry</a></li>
+<li><a href="#breaking-shperes">Breaking shperes</a></li>
+<li><a href="#results">Results</a></li>
+</ul>
+</nav>
+<p>Every good voxel game needs to allow you to modify its terrain, so I
+decided to implement some destruction.</p>
+<h2 id="ray-casting-to-click-voxels">Ray casting to click voxels</h2>
+<p>In my previous experiments I had already figured out how to enable
+clicking on a voxel. It seems like a very basic thing that many people
+should have done before, yet I found nothing except for an article that
+was way too professional for my taste. I also have no idea how it works.
+Still, if you want the code, here it is:</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp"><span class="hljs-comment">// I have no idea what this does</span>
+<span class="hljs-function"><span class="hljs-keyword">constexpr</span> <span class="hljs-type">int</span> <span class="hljs-title">signum</span><span class="hljs-params">(<span class="hljs-type">float</span> x)</span> </span>{
+    <span class="hljs-keyword">return</span> (x &gt; <span class="hljs-number">0</span>) ? <span class="hljs-number">1</span> : (x &lt; <span class="hljs-number">0</span>) ? <span class="hljs-number">-1</span> : <span class="hljs-number">0</span>;
+}
+
+<span class="hljs-comment">// what????????</span>
+<span class="hljs-function"><span class="hljs-keyword">constexpr</span> <span class="hljs-type">float</span> <span class="hljs-title">custom_mod</span> <span class="hljs-params">(<span class="hljs-type">float</span> value, <span class="hljs-type">float</span> modulus)</span> </span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-built_in">fmod</span>(<span class="hljs-built_in">fmod</span>(value, modulus) + modulus, modulus);
+}
+
+<span class="hljs-comment">// ????????????????????????????????</span>
+<span class="hljs-function"><span class="hljs-keyword">constexpr</span> <span class="hljs-type">float</span> <span class="hljs-title">intbound</span><span class="hljs-params">(<span class="hljs-type">float</span> s, <span class="hljs-type">float</span> ds)</span> </span>{
+    <span class="hljs-comment">// Find the smallest positive t such that s+t*ds is an integer.</span>
+    <span class="hljs-keyword">if</span> (ds &lt; <span class="hljs-number">0</span>) {
+        <span class="hljs-keyword">return</span> <span class="hljs-built_in">intbound</span>(-s, -ds);
+    } <span class="hljs-keyword">else</span> {
+        s = <span class="hljs-built_in">custom_mod</span>(s, <span class="hljs-number">1.0f</span>);
+        <span class="hljs-comment">// The problem is now s + t * ds = 1.0</span>
+        <span class="hljs-keyword">return</span> (<span class="hljs-number">1.0f</span> - s) / ds;
+    }
+}
+
+<span class="hljs-comment">// SelectedBlockInfo, as the name implies, contains info about a selected block (its position, material, etc)</span>
+<span class="hljs-function">SelectedBlockInfo <span class="hljs-title">World::getSelectedBlock</span><span class="hljs-params">(<span class="hljs-type">const</span> glm::vec3 &amp;position, <span class="hljs-type">const</span> glm::vec3 &amp;lookPosition, GLfloat range)</span> </span>{
+    <span class="hljs-type">int</span> x = <span class="hljs-built_in">static_cast</span>&lt;<span class="hljs-type">int</span>&gt;(std::<span class="hljs-built_in">floor</span>(position.x));
+    <span class="hljs-type">int</span> y = <span class="hljs-built_in">static_cast</span>&lt;<span class="hljs-type">int</span>&gt;(std::<span class="hljs-built_in">floor</span>(position.y));
+    <span class="hljs-type">int</span> z = <span class="hljs-built_in">static_cast</span>&lt;<span class="hljs-type">int</span>&gt;(std::<span class="hljs-built_in">floor</span>(position.z));
+
+    <span class="hljs-type">const</span> <span class="hljs-type">float</span> dx = lookPosition.x;
+    <span class="hljs-type">const</span> <span class="hljs-type">float</span> dy = lookPosition.y;
+    <span class="hljs-type">const</span> <span class="hljs-type">float</span> dz = lookPosition.z;
+
+    <span class="hljs-type">const</span> <span class="hljs-type">int</span> stepX = <span class="hljs-built_in">signum</span>(dx);
+    <span class="hljs-type">const</span> <span class="hljs-type">int</span> stepY = <span class="hljs-built_in">signum</span>(dy);
+    <span class="hljs-type">const</span> <span class="hljs-type">int</span> stepZ = <span class="hljs-built_in">signum</span>(dz);
+
+    <span class="hljs-type">float</span> tMaxX = <span class="hljs-built_in">intbound</span>(position.x, dx);
+    <span class="hljs-type">float</span> tMaxY = <span class="hljs-built_in">intbound</span>(position.y, dy);
+    <span class="hljs-type">float</span> tMaxZ = <span class="hljs-built_in">intbound</span>(position.z, dz);
+
+    <span class="hljs-type">const</span> <span class="hljs-type">float</span> tDeltaX = stepX / dx;
+    <span class="hljs-type">const</span> <span class="hljs-type">float</span> tDeltaY = stepY / dy;
+    <span class="hljs-type">const</span> <span class="hljs-type">float</span> tDeltaZ = stepZ / dz;
+
+    <span class="hljs-keyword">if</span> (dx == <span class="hljs-number">0</span> &amp;&amp; dy == <span class="hljs-number">0</span> &amp;&amp; dz == <span class="hljs-number">0</span>) {
+        <span class="hljs-comment">// ray cast in zero direction, error</span>
+        ...
+    }
+
+    <span class="hljs-type">char</span> face[<span class="hljs-number">3</span>] = {<span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>};
+
+    <span class="hljs-keyword">while</span> (
+            <span class="hljs-comment">// the og one checks the range here, I don't (idk why exactly, need to measure if it my version is accurate)</span>
+            (<span class="hljs-literal">true</span>)) {
+        <span class="hljs-comment">// check if out of world bounds</span>
+        <span class="hljs-keyword">if</span> (!(x &lt; MIN_X || y &lt; MIN_Y || z &lt; MIN_Z || x &gt; MAX_X || y &gt; MAX_Y || z &gt; MAX_Z)) {
+            <span class="hljs-type">const</span> glm::ivec3 coords = glm::<span class="hljs-built_in">ivec3</span>(x, y, z);
+
+            <span class="hljs-comment">// a function I made that gets the info of a block from some world coords</span>
+            SelectedBlockInfo blockInfo = <span class="hljs-built_in">getBlockInfo</span>(coords);
+
+
+            <span class="hljs-keyword">if</span> (! blockInfo.<span class="hljs-built_in">isEmpty</span>()) {
+
+                <span class="hljs-comment">// ugly, will change later</span>
+                <span class="hljs-comment">// basically you can know what face of the voxel you have reached</span>
+                <span class="hljs-keyword">if</span> (face[<span class="hljs-number">0</span>] == <span class="hljs-number">1</span>) blockInfo.normal = NORMAL_POS_X;
+                <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (face[<span class="hljs-number">0</span>] == <span class="hljs-number">-1</span>) blockInfo.normal = NORMAL_NEG_X;
+
+                <span class="hljs-keyword">if</span> (face[<span class="hljs-number">1</span>] == <span class="hljs-number">1</span>) blockInfo.normal = NORMAL_POS_Y;
+                <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (face[<span class="hljs-number">1</span>] == <span class="hljs-number">-1</span>) blockInfo.normal = NORMAL_NEG_Y;
+
+                <span class="hljs-keyword">if</span> (face[<span class="hljs-number">2</span>] == <span class="hljs-number">1</span>) blockInfo.normal = NORMAL_POS_Z;
+                <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (face[<span class="hljs-number">2</span>] == <span class="hljs-number">-1</span>) blockInfo.normal = NORMAL_NEG_Z;
+                <span class="hljs-keyword">return</span> blockInfo;
+            }
+        }
+
+        <span class="hljs-comment">// ugly magic</span>
+        <span class="hljs-keyword">if</span> (tMaxX &lt; tMaxY) {
+            <span class="hljs-keyword">if</span> (tMaxX &lt; tMaxZ) {
+                <span class="hljs-keyword">if</span> (tMaxX &gt; range) <span class="hljs-keyword">break</span>;
+                x += stepX;
+                tMaxX += tDeltaX;
+                face[<span class="hljs-number">0</span>] = -stepX;
+                face[<span class="hljs-number">1</span>] = <span class="hljs-number">0</span>;
+                face[<span class="hljs-number">2</span>] = <span class="hljs-number">0</span>;
+            } <span class="hljs-keyword">else</span> {
+                <span class="hljs-keyword">if</span> (tMaxZ &gt; range) <span class="hljs-keyword">break</span>;
+                z += stepZ;
+                tMaxZ += tDeltaZ;
+                face[<span class="hljs-number">0</span>] = <span class="hljs-number">0</span>;
+                face[<span class="hljs-number">1</span>] = <span class="hljs-number">0</span>;
+                face[<span class="hljs-number">2</span>] = -stepZ;
+            }
+        } <span class="hljs-keyword">else</span> {
+            <span class="hljs-keyword">if</span> (tMaxY &lt; tMaxZ) {
+                <span class="hljs-keyword">if</span> (tMaxY &gt; range) <span class="hljs-keyword">break</span>;
+                y += stepY;
+                tMaxY += tDeltaY;
+                face[<span class="hljs-number">0</span>] = <span class="hljs-number">0</span>;
+                face[<span class="hljs-number">1</span>] = -stepY;
+                face[<span class="hljs-number">2</span>] = <span class="hljs-number">0</span>;
+            } <span class="hljs-keyword">else</span> {
+                <span class="hljs-keyword">if</span> (tMaxZ &gt; range) <span class="hljs-keyword">break</span>;
+                z += stepZ;
+                tMaxZ += tDeltaZ;
+                face[<span class="hljs-number">0</span>] = <span class="hljs-number">0</span>;
+                face[<span class="hljs-number">1</span>] = <span class="hljs-number">0</span>;
+                face[<span class="hljs-number">2</span>] = -stepZ;
+            }
+        }
+
+
+
+    }
+    <span class="hljs-comment">// nothing found within range</span>
+    ...
+}</code></pre>
+<p>This algorithm is only concerned with cubes, and does not detect you
+clicking marching cubes geometry. Still, it works well enough for broad
+destruction since you only care if there is something in the general
+area.</p>
+<p>getBlockInfo() is also a bit ugly but here it goes:</p>
+<p><strong>NOTE:</strong> this function heavily depends on me using a 3D
+array for my chunks, and will probably change for the future. Still, the
+math is such a mess it is actually funny that it works at all. Yes this
+was the best I could come up with, it’s harder than it looks due to the
+middle of the array representing chunks at [0][0][0], there can be
+negative coordinates, negative chunks go up to -1 and not 0 (off by 1
+errors are the worst).</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp"><span class="hljs-function">SelectedBlockInfo <span class="hljs-title">World::getBlockInfo</span><span class="hljs-params">(<span class="hljs-type">const</span> glm::ivec3 &amp;position)</span> </span>{
+    <span class="hljs-comment">// had weird innacuracies when values were not floats, like -7.15 + 8 == 0 but actualy was -7 + 8 == 1, so I cast things explicitly</span>
+
+    <span class="hljs-comment">// from the coordinates, get the chunk that they belong to</span>
+    Chunk *chunk = &amp;chunks <span class="hljs-comment">// this gets ID of the chunk</span>
+        [<span class="hljs-built_in">static_cast</span>&lt;GLuint&gt;((<span class="hljs-built_in">static_cast</span>&lt;GLfloat&gt;(position.x) / CHUNK_SIZE_FLOAT) + (WORLD_SIZE_X_FLOAT / <span class="hljs-number">2.0f</span>))]
+        [<span class="hljs-built_in">static_cast</span>&lt;GLuint&gt;((<span class="hljs-built_in">static_cast</span>&lt;GLfloat&gt;(position.y) / CHUNK_SIZE_FLOAT) + (WORLD_SIZE_Y_FLOAT / <span class="hljs-number">2.0f</span>))]
+        [<span class="hljs-built_in">static_cast</span>&lt;GLuint&gt;((<span class="hljs-built_in">static_cast</span>&lt;GLfloat&gt;(position.z) / CHUNK_SIZE_FLOAT) + (WORLD_SIZE_Z_FLOAT / <span class="hljs-number">2.0f</span>))];
+
+
+    <span class="hljs-comment">// get position inside of the chunk</span>
+    <span class="hljs-comment">// the last % feels bad, it's only for when &lt;math&gt; == CHUNK_SIZE to prevent resulting in CHUNK_SIZE. have to redo this math</span>
+    glm::u8vec3 pos;
+    <span class="hljs-keyword">if</span> (position.x &lt; <span class="hljs-number">0</span>) {
+        pos.x = (CHUNK_SIZE - (<span class="hljs-built_in">abs</span>(position.x) % CHUNK_SIZE)) % CHUNK_SIZE;
+    } <span class="hljs-keyword">else</span> {
+        pos.x = position.x % CHUNK_SIZE;
+    }
+    
+    <span class="hljs-keyword">if</span> (position.y &lt; <span class="hljs-number">0</span>) {
+        pos.y = (CHUNK_SIZE - (<span class="hljs-built_in">abs</span>(position.y) % CHUNK_SIZE)) % CHUNK_SIZE;
+    } <span class="hljs-keyword">else</span> {
+        pos.y = position.y % CHUNK_SIZE;
+    }
+    
+    <span class="hljs-keyword">if</span> (position.z &lt; <span class="hljs-number">0</span>) {
+        pos.z = (CHUNK_SIZE - (<span class="hljs-built_in">abs</span>(position.z) % CHUNK_SIZE)) % CHUNK_SIZE;
+    } <span class="hljs-keyword">else</span> {
+        pos.z = position.z % CHUNK_SIZE;
+    }
+
+    ...
+}</code></pre>
+<h2 id="applying-this-to-marching-cubes-geometry">Applying this to
+marching cubes geometry</h2>
+<p>Breaking cubes is nice and easy. But how should breaking a marching
+cubes voxel be handled? Also, like I mentioned, I haven’t implemented a
+way of detecting the exact geometry that was clicked, only a small area
+around/inside it.</p>
+<p>The answer is I don’t know. I’ll update this when (if) I figure it
+out.</p>
+<h2 id="breaking-shperes">Breaking shperes</h2>
+<p>For now, I will allow the player to break simple and bigger shapes,
+like spheres. You can make this very efficient by creating a bounding
+box of chunks, and then, for the chunks within it, make another bounding
+box for the voxels themselves. You can even delete entire rows/columns
+at once. I didn’t have the time to do this yet since it is a very small
+and specific feature and there are lots of things to do, so here is the
+simple brute force version.</p>
+<p>Again, this assumes the chunks being in a 3D static array</p>
+<p>In the world:</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp"><span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">breakVoxelSphere</span><span class="hljs-params">(<span class="hljs-type">const</span> SelectedBlockInfo &amp;selectedInfo, GLfloat radius)</span> </span>{
+    <span class="hljs-type">const</span> glm::vec3 center = glm::<span class="hljs-built_in">vec3</span>(selectedInfo.world_pos);
+
+    <span class="hljs-comment">// this constant is the size of the diagonal of a 1x1 cube (ie, the biggest possible distance inside of it)</span>
+    <span class="hljs-comment">// sqrt(2 * x^2 + x^2), x = 1, sqrt(3)</span>
+    <span class="hljs-keyword">constexpr</span> GLfloat diagonal = <span class="hljs-number">1.73205080757f</span>;
+
+    <span class="hljs-comment">// 2 spheres will be calculated, one that is big enough to make sure no chunk that should be considered is in fact not considered,</span>
+    <span class="hljs-comment">// and a smaller one where all chunks within can be considered as being completely empty after the destruction</span>
+    <span class="hljs-type">const</span> GLfloat big_radius   = radius + (diagonal * CHUNK_SIZE_FLOAT);
+    <span class="hljs-type">const</span> GLfloat small_radius = radius - (diagonal * CHUNK_SIZE_FLOAT);
+
+    <span class="hljs-comment">// SMALL SPHERE CHECK</span>
+    <span class="hljs-keyword">if</span> (small_radius &gt;= CHUNK_SIZE_FLOAT) {
+        <span class="hljs-comment">// calculate the bounding box and destroy every chunk inside it, also ensure chunks are inside the world</span>
+        GLint min_x = glm::<span class="hljs-built_in">clamp</span>(<span class="hljs-built_in">static_cast</span>&lt;GLint&gt;(((center.x - small_radius) / CHUNK_SIZE_FLOAT) + (WORLD_SIZE_X_FLOAT / <span class="hljs-number">2.0f</span>)), <span class="hljs-number">0</span>, WORLD_SIZE_X - <span class="hljs-number">1</span>),
+              max_x = glm::<span class="hljs-built_in">clamp</span>(<span class="hljs-built_in">static_cast</span>&lt;GLint&gt;(((center.x + small_radius) / CHUNK_SIZE_FLOAT) + (WORLD_SIZE_X_FLOAT / <span class="hljs-number">2.0f</span>)), <span class="hljs-number">0</span>, WORLD_SIZE_X - <span class="hljs-number">1</span>),
+              min_y = glm::<span class="hljs-built_in">clamp</span>(<span class="hljs-built_in">static_cast</span>&lt;GLint&gt;(((center.y - small_radius) / CHUNK_SIZE_FLOAT) + (WORLD_SIZE_Y_FLOAT / <span class="hljs-number">2.0f</span>)), <span class="hljs-number">0</span>, WORLD_SIZE_Y - <span class="hljs-number">1</span>),
+              max_y = glm::<span class="hljs-built_in">clamp</span>(<span class="hljs-built_in">static_cast</span>&lt;GLint&gt;(((center.y + small_radius) / CHUNK_SIZE_FLOAT) + (WORLD_SIZE_Y_FLOAT / <span class="hljs-number">2.0f</span>)), <span class="hljs-number">0</span>, WORLD_SIZE_Y - <span class="hljs-number">1</span>),
+              min_z = glm::<span class="hljs-built_in">clamp</span>(<span class="hljs-built_in">static_cast</span>&lt;GLint&gt;(((center.z - small_radius) / CHUNK_SIZE_FLOAT) + (WORLD_SIZE_Z_FLOAT / <span class="hljs-number">2.0f</span>)), <span class="hljs-number">0</span>, WORLD_SIZE_Z - <span class="hljs-number">1</span>),
+              max_z = glm::<span class="hljs-built_in">clamp</span>(<span class="hljs-built_in">static_cast</span>&lt;GLint&gt;(((center.z + small_radius) / CHUNK_SIZE_FLOAT) + (WORLD_SIZE_Z_FLOAT / <span class="hljs-number">2.0f</span>)), <span class="hljs-number">0</span>, WORLD_SIZE_Z - <span class="hljs-number">1</span>);
+
+        <span class="hljs-keyword">for</span> (GLint x = min_x; x &lt;= max_x; x++) {
+            <span class="hljs-keyword">for</span> (GLint y = min_y; y &lt;= max_y; y++) {
+                <span class="hljs-keyword">for</span> (GLint z = min_z; z &lt;= max_z; z++) {
+                    chunks[x][y][z].<span class="hljs-built_in">destroyChunk</span>();
+                }
+            }
+        }
+    }
+
+    <span class="hljs-comment">// BIG SPHERE CHECK</span>
+    GLint min_x = glm::<span class="hljs-built_in">clamp</span>(<span class="hljs-built_in">static_cast</span>&lt;GLint&gt;(((center.x - big_radius) / CHUNK_SIZE_FLOAT) + (WORLD_SIZE_X_FLOAT / <span class="hljs-number">2.0f</span>)), <span class="hljs-number">0</span>, WORLD_SIZE_X - <span class="hljs-number">1</span>),
+          max_x = glm::<span class="hljs-built_in">clamp</span>(<span class="hljs-built_in">static_cast</span>&lt;GLint&gt;(((center.x + big_radius) / CHUNK_SIZE_FLOAT) + (WORLD_SIZE_X_FLOAT / <span class="hljs-number">2.0f</span>)), <span class="hljs-number">0</span>, WORLD_SIZE_X - <span class="hljs-number">1</span>),
+          min_y = glm::<span class="hljs-built_in">clamp</span>(<span class="hljs-built_in">static_cast</span>&lt;GLint&gt;(((center.y - big_radius) / CHUNK_SIZE_FLOAT) + (WORLD_SIZE_Y_FLOAT / <span class="hljs-number">2.0f</span>)), <span class="hljs-number">0</span>, WORLD_SIZE_Y - <span class="hljs-number">1</span>),
+          max_y = glm::<span class="hljs-built_in">clamp</span>(<span class="hljs-built_in">static_cast</span>&lt;GLint&gt;(((center.y + big_radius) / CHUNK_SIZE_FLOAT) + (WORLD_SIZE_Y_FLOAT / <span class="hljs-number">2.0f</span>)), <span class="hljs-number">0</span>, WORLD_SIZE_Y - <span class="hljs-number">1</span>),
+          min_z = glm::<span class="hljs-built_in">clamp</span>(<span class="hljs-built_in">static_cast</span>&lt;GLint&gt;(((center.z - big_radius) / CHUNK_SIZE_FLOAT) + (WORLD_SIZE_Z_FLOAT / <span class="hljs-number">2.0f</span>)), <span class="hljs-number">0</span>, WORLD_SIZE_Z - <span class="hljs-number">1</span>),
+          max_z = glm::<span class="hljs-built_in">clamp</span>(<span class="hljs-built_in">static_cast</span>&lt;GLint&gt;(((center.z + big_radius) / CHUNK_SIZE_FLOAT) + (WORLD_SIZE_Z_FLOAT / <span class="hljs-number">2.0f</span>)), <span class="hljs-number">0</span>, WORLD_SIZE_Z - <span class="hljs-number">1</span>);
+
+
+    <span class="hljs-keyword">for</span> (GLint x = min_x; x &lt;= max_x; x++) {
+        <span class="hljs-keyword">for</span> (GLint y = min_y; y &lt;= max_y; y++) {
+            <span class="hljs-keyword">for</span> (GLint z = min_z; z &lt;= max_z; z++) {
+                Chunk &amp;chunk = chunks[x][y][z];
+                <span class="hljs-keyword">if</span> (! chunk.<span class="hljs-built_in">isDestroyed</span>()) {
+                    chunk.<span class="hljs-built_in">breakSphere</span>(center, radius * radius, <span class="hljs-built_in">getChunkCoordsFloat</span>(x, y, z));
+                }
+            }
+        }
+    }
+}</code></pre>
+<p>In the chunk, very naive implementation where I check the distance
+from the sphere to the corner:</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp"><span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">Chunk::breakSphere</span><span class="hljs-params">(<span class="hljs-type">const</span> glm::vec3 &amp;center, GLfloat radius_squared, <span class="hljs-type">const</span> glm::vec3 &amp;offset)</span> </span>{
+    <span class="hljs-comment">// iterating over corners, not voxels</span>
+    <span class="hljs-keyword">for</span> (GLint x = <span class="hljs-number">0</span>; x &lt; CHUNK_SIZE_CORNERS; x++) {
+        <span class="hljs-keyword">for</span> (GLint y = <span class="hljs-number">0</span>; y &lt; CHUNK_SIZE_CORNERS; y++) {
+            <span class="hljs-keyword">for</span> (GLint z = <span class="hljs-number">0</span>; z &lt; CHUNK_SIZE_CORNERS; z++) {
+                <span class="hljs-comment">// if the corner is inside the sphere</span>
+                <span class="hljs-keyword">if</span> (glm::<span class="hljs-built_in">distance2</span>(glm::<span class="hljs-built_in">vec3</span>(x, y, z) + offset, center) &lt;= radius_squared) {
+                    <span class="hljs-comment">// breaks a corner (not a voxel), just flips a bit to 0 in the bitmap</span>
+                    <span class="hljs-built_in">breakCornerAt</span>(glm::<span class="hljs-built_in">u8vec3</span>(x, y, z));
+                }
+            }
+        }
+    }
+}</code></pre>
+<p>There are still some nuances to it due to marching cubes using
+corners and not the cubes themselves, and cubes sharing vertices.
+Sometimes corners/chunks that should be destroyed are assumed to be out
+of the bounding box, and there is also an easy optimization to be
+made.</p>
+<p>First, I check the voxels in a smaller shpere, where I am 100%
+certain any chunk inside it can be instantly erased.</p>
+<p>Then, I check the voxels in a bigger sphere, otherwise some chunks
+could escape, since the position being checked is one of its corners and
+not the middle of the chunk.</p>
+<p>You might also notice I never use square roots for the distances. If
+you want to compare sqrt(A) &lt; sqrt(B) you can also just do A &lt; B,
+so I use radius^2 and use glm::distance2 which does not apply sqrt.</p>
+<p><strong>Note:</strong> When something gets destroyed, I set a bool
+that indicates the chunk is dirty, that is, the mesh(es) need to be
+rebuilt. I explain this more in depth in other posts.</p>
+<h2 id="results">Results</h2>
+<video class="border" src="Videos/destruction_1.mp4" controls="">
+</video>
+  <div class="debug-grid"></div>
+  <script src="index.js"></script>
+
+<footer>
+</footer>
+
+</body></html>
