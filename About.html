@@ -43,21 +43,18 @@
 interesting/useful things I’ve learned</p>
 <p>I’m also going into it blind, never having used a game engine
 before</p>
-<p>I will also share my very strong opinions as a new dev using tools
-older than me</p>
+<p>I will also share my opinions on the things I use</p>
 <h2 id="why">Why</h2>
-<p>I’ve like videogames for as long as I can remember. Being a child
-through the 2000s meant I saw their evolution, and still remember being
-blown away by minecraft, and how it had endless possibilities as it
-allowed the player to place and remove terrain at will. My tiny brain
-could not believe it when I saw a lever opening a door. How did the game
-know? Why did the door open instantly instead of having an animation? I
-was so mesmerized I did not even notice that it ran at 5fps, nor that
-having chunk render distance to the max could the the culprit. I thought
-to myself, maybe someday I can make my own game. I can make the doors
-have an animation, and I’ll have so much control over this that I can
-even set the speed they open at. How innocent I was.</p>
-<p>Over the years I’ve done small projects that enabled me to learn some
+<p>I’ve always had an interest in videogames. I witnessed their
+evolution, and remember being blown away by minecraft, as I could not
+comprehend that a computer could handle an infinite world where you
+could build and destroy anything. Even a lever opening a door raised so
+many questions. How did the game know that this lever should open the
+door? Why does it open instantly and not smoothly? How does anything
+about a game work? How do you make one? I though someday I will be able
+to understand all of this and make my own game, with my own smooth
+doors.</p>
+<p>Recently I’ve done some small projects that enabled me to learn some
 of the required skills. I started by experimenting with C++ and OpenGL,
 learning completely on my own which brought me a lot of pain an
 suffering. I will never forget my first textured quad. Taking
@@ -65,16 +62,16 @@ inspiration from <a href="https://youtu.be/lS_qeBy3aQI">this video</a>,
 I made a <a href="https://github.com/IVSOP/Particles">particle
 simulator</a>, which allowed me to learn some rendering concepts (like
 batching and instancing) and also get comfortable with some optimization
-techniques, like SIMD.</p>
+techniques, like SIMD and spatial partitioning.</p>
 <p>I then made an extremely naive implementation of a minecraft-like
-game, teaching me some 3D skills, and taking a few years off my lifespan
-trying to debug all the errors.</p>
+game, teaching me some 3D skills. It also made me realize how hard it
+must be to make a 3D game, and how performance intensive graphics are
+when not optimized properly.</p>
 <p>In university, I got to do a very simple 3D graphics engine, which
 pushed me to learn many more advanced concepts, like bloom, HDR and
-color correction, rendering of many objects of the same model in
-different places, texture buffers, framebuffers, blinn-phong lighting,
-and also learning the actual math behind all of these. I just used the
-🐐 <a href="https://learnopengl.com/">learnopengl</a> for this.</p>
+color correction, rendering models and bezier surfaces, texture buffers,
+framebuffers, blinn-phong lighting, and also learning the actual math
+behind all of these. I just used the 🐐 <a href="https://learnopengl.com/">learnopengl</a> for this.</p>
 <p>Eventually I came accross videos on voxel engines like <a href="https://youtu.be/40JzyaOYJeY">this</a>, <a href="https://youtu.be/qnGoGq7DWMc?">this</a> and <a href="https://youtu.be/NwP2VVnRt3Q">this</a>, which were so impressive
 they re-sparked my interest for minecraft, and how I could make a better
 version of it.</p>
@@ -83,18 +80,18 @@ finally had the skills to (begin to) tackle this.</p>
 <p>I actually managed to implement the concepts these videos talked
 about, like indirect rendering, many forms of culling, and even made my
 own binary greedy mesher (the one you find online is completely
-unreadable, so I made my own. I regret this, do not do it), which you
+unreadable, so I made my own. I regret this, do not try it), which you
 can find <a href="https://github.com/IVSOP/VoxelEngine">here</a>. Still,
 I just felt like something was missing. It wasn’t interesting enough,
-just a worse minecraft clone than other minecraft clones.</p>
+just shaping up to be another minecraft clone.</p>
 <p>Some time ago I had seen some videos on an algorithm(?) called
 marching cubes. The name itself is interesting. Where are they going?
-How does a cube march? I will explain this in-depth on another post.</p>
-<p>After some head scratching, watching some videos and stealing some
+How does a cube march?</p>
+<p>After some head scratching, watching some videos and borrowing some
 code, I managed to get it to work, and I felt like I had the skills to
 keep going and make a full game out of it. It’s still minecraft-like
-voxels, but it no longer looks like a minecraft clone. But this was just
-the beginning.</p>
+voxels, but it no longer looks like a minecraft clone, and presents many
+different challenges. But this was just the beginning.</p>
 <h2 id="attribution">Attribution</h2>
 <details>
 <summary>
@@ -162,7 +159,7 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 <pre></pre></pre></details>
   <div class="debug-grid"></div>
-  <script src="index.js"></script>
+  <script src="scripts/index.js"></script>
 
 <footer>
 </footer>
