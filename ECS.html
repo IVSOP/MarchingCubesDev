@@ -1,0 +1,137 @@
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+  <meta charset="utf-8">
+  <meta name="generator" content="pandoc">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Marching Cubes devlog</title>
+  <link rel="stylesheet" href="styles/reset.css">
+  <link rel="stylesheet" href="styles/index.css">
+  <link rel="stylesheet" href="styles/hljs/github-dark.min.css">
+</head>
+<body>
+<table class="header">
+  <tbody><tr>
+    <td rowspan="2" class="width-auto">
+      <h1 class="title">Marching Cubes devlog</h1>
+      <span class="subtitle">ECS</span>
+    </td>
+	<td>
+		<a href="index">Main page</a>
+	</td>
+  </tr>
+  <tr>
+    <td class="width-min">
+		<span style="white-space: pre;">Updated: 9/2024</span>
+	</td>
+  </tr>
+</tbody></table>
+<label class="debug-toggle-label"><input type="checkbox" class="debug-toggle"> Debug mode</label>
+<nav id="TOC" role="doc-toc">
+<!-- <h2 id="toc-title">Contents</h2>
+ -->
+<ul>
+<li><a href="#storing-entities">Storing entities</a></li>
+<li><a href="#entity-component-system">Entity Component System</a></li>
+<li><a href="#entt">EnTT</a></li>
+<li><a href="#the-segfaults">The segfaults</a></li>
+<li><a href="#lazy-guide-to-entt">Lazy guide to EnTT</a>
+<ul>
+<li><a href="#creating-a-registry-and-entities">Creating a registry and
+entities</a></li>
+<li><a href="#adding-components">Adding components</a></li>
+<li><a href="#iterating-over-entities">Iterating over entities</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="storing-entities">Storing entities</h1>
+<p>Very early on it became obvious I needed some way of storing
+entities. It was also clear that I won’t use OOP (I hate it and it
+wouldn’t work here anyway), and that different entities need to have
+different attributes. An easy solution would be to make a struct with
+all the different attributes an entity could have. This is bad because
+it not only wastes space but also needs several extra checks to see what
+attributes the entity actually has, slowing everything down. I needed a
+quick way to traverse entities that had certain attributes, while doing
+so efficiently. But how?</p>
+<h1 id="entity-component-system">Entity Component System</h1>
+<p>After some researching, I learned about ECS, and that it was very
+common for games. The idea is:</p>
+<ul>
+<li>Each entity has an ID</li>
+<li>Each entity has one or more components</li>
+<li>A system does logic over entities that have a certain combination of
+components</li>
+</ul>
+<p>I was unsure if this is actually what I wanted at first. Usually the
+solutions with a lot of flexibility and hierarchy come at the cost of
+performance. I saw more videos about why it was bad than why it was
+good, but I wanted to see it for myself.</p>
+<h1 id="entt">EnTT</h1>
+<p>I then came across <a href="https://github.com/skypjack/entt">EnTT</a>, and even saw that The
+Cherno made a <a href="https://youtu.be/D4hz0wEB978">video</a> on it. I
+was surprised at how simple it was. It actually felt like compile-time
+magic. It also did EXACTLY what I needed, storing entities efficiently
+in a way that allows for fast traversal of entities with a certain
+combination of components. So, I decided to use it.</p>
+<h1 id="the-segfaults">The segfaults</h1>
+<p>At first everything was going great, entt was easy to use and worked
+fine. Then, the segfaults attacked. Long story short, entt is actually
+more nuanced than it seems at first, due to C++ things. Objects were
+getting copied/moved/destroyed and constructed again where I didn’t want
+this to happen, as 1) it’s slow and 2) most of my objects own some
+internal pointers which are meant to be freed at the end of their life.
+I also don’t want to define 20 different operators for my sexy and clean
+structs so I had to dive into the docs to see what I could do.</p>
+<h1 id="lazy-guide-to-entt">Lazy guide to EnTT</h1>
+<h2 id="creating-a-registry-and-entities">Creating a registry and
+entities</h2>
+<p>The registry is what owns the entities and their data. You can create
+it, along with an entity, by just doing</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;entt.hpp&gt;</span></span>
+
+entt::registry registry;
+entt::entity entity = entt_registry.<span class="hljs-built_in">create</span>();</code></pre>
+<h2 id="adding-components">Adding components</h2>
+<p>Obviously you need to be able to add components to your entities. You
+can do so like this:</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp"><span class="hljs-keyword">struct</span> <span class="hljs-title class_">MyComponent</span> {
+    ...
+};
+
+registry.<span class="hljs-built_in">emplace</span>&lt;MyComponent&gt;(entity, args...);</code></pre>
+<h2 id="iterating-over-entities">Iterating over entities</h2>
+<p>This is where it gets confusing. There is a lot more to entt than it
+seems at first. The docs explain everything well, the problem is there
+is a lot to explain, and without segfaulting everywhere you won’t know
+what features you need.</p>
+<p>You can use either views or groups to iterate over entities. Since I
+read in the docs that groups are faster but with more limitations,
+that’s what I’ll use. I will only optimize it once it becomes a
+bottleneck, which is pretty far from happening yet.</p>
+<p>Using a group to get the entities with <code>MyComponent</code>
+component:</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp"><span class="hljs-keyword">auto</span> group = registry.<span class="hljs-built_in">group</span>&lt;MyComponent&gt;();
+<span class="hljs-keyword">for</span> (<span class="hljs-keyword">auto</span> entity : group) {
+    MyComponent &amp;component = group.<span class="hljs-built_in">get</span>&lt;MyComponent&gt;(entity);
+
+    ...
+}</code></pre>
+<p>I found out the hard way that this causes the MyComponent struct to
+be copied/moved. You can fix that by making it not be owned by the
+group, at a performance cost. Example with two components, neither being
+owned by the group:</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp"><span class="hljs-keyword">auto</span> group = registry.group&lt;&gt;(entt::get&lt;MyComponent1, MyComponent2&gt;);
+...</code></pre>
+<p><strong>NOTE:</strong> Doing this does NOT work:</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp"><span class="hljs-keyword">auto</span> group1 = registry.<span class="hljs-built_in">group</span>&lt;A&gt;(entt::get&lt;B&gt;);
+<span class="hljs-keyword">auto</span> group2 = registry.<span class="hljs-built_in">group</span>&lt;A&gt;(entt::get&lt;C&gt;);</code></pre>
+<p>Since A is owned by two groups at once, things go bad and you get a
+segfault.</p>
+<p>In the future I plan on reusing created groups and making them
+full-owning groups, so I will update this when needed.</p>
+  <div class="debug-grid"></div>
+  <script src="scripts/index.js"></script>
+
+<footer>
+</footer>
+
+</body></html>
