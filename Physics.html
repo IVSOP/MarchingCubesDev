@@ -76,7 +76,7 @@ to 0 to prevent falling through the ground. Early results:</p>
 <p>Then, I decided I needed friction when the player was on the ground.
 This was much harder than I thought, and I ended up making a jumbled
 mess of forces, accelerations and velocities, to in the end not even use
-forces at all and just to</p>
+forces at all and just do</p>
 <pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp">vel -= (vel * friction_coeff) * deltatime;</code></pre>
 <p>I then wanted to add actual colisions with the terrain, and this is
 where everything fell apart. Where do I even begin? How do I know the
@@ -132,9 +132,8 @@ arquitecture. Expect segfaults when you do something wrong.</li>
 physics uses them everywhere.</li>
 <li>There are a lot of things to help you, the engine is purpose-built
 for games. You can get AABBs, transforms, …</li>
-<li>The docs feel great now, but not as a total beginner. You have to
-fight through the learning pains, as you need to learn the concepts of
-jolt physics. Starting is the hardest part by far.</li>
+<li>The docs feel great now, but not as a total beginner. Starting is
+the hardest part by far.</li>
 <li>You cannot have a mesh shape be empty, or have an empty body. I
 really tried</li>
 </ul>
@@ -188,7 +187,7 @@ Ref&lt;JPH::Shape&gt; res = shapeResult.<span class="hljs-built_in">Get</span>()
 shape:</p>
 <pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp"><span class="hljs-function">JPH::Body *<span class="hljs-title">createBodyFromShape</span><span class="hljs-params">(JPH::RefConst&lt;JPH::Shape&gt; shape, <span class="hljs-type">const</span> JPH::Vec3 &amp;translation, <span class="hljs-type">const</span> JPH::Quat &amp;rotation)</span> </span>{
     <span class="hljs-function">BodyCreationSettings <span class="hljs-title">bodySettings</span><span class="hljs-params">(shape, translation, rotation, EMotionType::Dynamic, Layers::MOVING)</span></span>;
-    BodyInterface &amp;bodyInterface = <span class="hljs-built_in">getBodyInterface</span>();
+    BodyInterface &amp;bodyInterface = <span class="hljs-built_in">getBodyInterface</span>(); <span class="hljs-comment">// implement this yourself, you should have the interface stored somewhere</span>
     Body* body = bodyInterface.<span class="hljs-built_in">CreateBody</span>(bodySettings);
     bodyInterface.<span class="hljs-built_in">AddBody</span>(body-&gt;<span class="hljs-built_in">GetID</span>(), EActivation::DontActivate);
     <span class="hljs-keyword">return</span> body;
@@ -202,16 +201,20 @@ docs.</p>
 <p>All you have to do is make one body per entity, make it dynamic and
 in the right layer, and activate it. Gravity is applied automatically,
 and to render, you can get the transform matrix straight out of the body
-using body-&gt;GetWorldTransform(). However this gives you a
-JPH::RMat44. I didn’t have the patience to see what this format was vs
-the glm::mat4, so here is a dirty manual conversion:</p>
+using</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp">body-&gt;<span class="hljs-built_in">GetWorldTransform</span>()</code></pre>
+<p>However this gives you a JPH::RMat44. I didn’t have the patience to
+see what this format was vs the glm::mat4, so here is a dirty manual
+conversion:</p>
 <pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp">JPH::RVec3 position = body-&gt;<span class="hljs-built_in">GetPosition</span>();
 JPH::Quat rotation = body-&gt;<span class="hljs-built_in">GetRotation</span>();
 
 glm::mat4 translationMatrix = glm::<span class="hljs-built_in">translate</span>(glm::<span class="hljs-built_in">mat4</span>(<span class="hljs-number">1.0f</span>), glm::<span class="hljs-built_in">vec3</span>(position.<span class="hljs-built_in">GetX</span>(), position.<span class="hljs-built_in">GetY</span>(), position.<span class="hljs-built_in">GetZ</span>()));
 <span class="hljs-comment">// use glm::rotate instead???</span>
 <span class="hljs-function">glm::quat <span class="hljs-title">glmQuat</span><span class="hljs-params">(rotation.GetW(), rotation.GetX(), rotation.GetY(), rotation.GetZ())</span></span>;
-glm::mat4 rotationMatrix = glm::<span class="hljs-built_in">toMat4</span>(glmQuat);</code></pre>
+glm::mat4 rotationMatrix = glm::<span class="hljs-built_in">toMat4</span>(glmQuat);
+
+<span class="hljs-keyword">return</span> translationMatrix * rotationMatrix;</code></pre>
 <h2 id="loading-hitboxes">Loading hitboxes</h2>
 <p>Like I said somewhere in another post, I use assimp to load my
 models. How am I going to load the hitbox? I need to make shapes, like
