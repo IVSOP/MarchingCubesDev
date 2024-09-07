@@ -79,11 +79,11 @@ somefunc(MAIN_ARG
 <span class="hljs-keyword">message</span>(WARNING <span class="hljs-string">"this is how you print messages. there are other severities other than just warning"</span>)</code></pre>
 <h2 id="basic-usage">Basic usage</h2>
 <p>CMake will by default look for a CMakeLists.txt with instructions on
-what to do, so taht’s where you will be writing things.</p>
+what to do, so that’s where you will be writing things.</p>
 <p>Generate the makefile and other things:</p>
 <pre class="bash"><code data-highlighted="yes" class="hljs language-bash"><span class="hljs-comment"># the build type is usually Release or Debug. This makes cmake define some options for the compiler,</span>
 <span class="hljs-comment"># for example telling it to compile with debug symbols</span>
-<span class="hljs-comment"># CMakeLists.txt is in '.' build files are to be written to 'build/''</span>
+<span class="hljs-comment"># CMakeLists.txt is in '.' build files are to be written to 'build/'</span>
 cmake -DCMAKE_BUILD_TYPE=Release -S . -B build</code></pre>
 <p>Actually run the makefile:</p>
 <pre class="bash"><code data-highlighted="yes" class="hljs language-bash">cmake --build build --parallel $(<span class="hljs-built_in">nproc</span>)</code></pre>
@@ -111,9 +111,9 @@ code files it depends on.</p>
     ...
 )</code></pre>
 <p>This tells cmake you want to generate an executable called
-MyExecutable, that depends on those source files, which will be
-compiled. This executable is called a <code>target</code>. You might
-also need to tell cmake where to find header files for your target:</p>
+MyExecutable, that depends on those source files. This executable is
+called a <code>target</code>. You might also need to tell cmake where to
+find header files for your target:</p>
 <pre class="cmake"><code data-highlighted="yes" class="hljs language-cmake"><span class="hljs-keyword">target_include_directories</span>(MyExecutable
         PUBLIC <span class="hljs-keyword">include</span>/
 )</code></pre>
@@ -140,8 +140,8 @@ project in itself (contains a CMakeLists.txt)</h3>
 <pre class="cmake"><code data-highlighted="yes" class="hljs language-cmake"><span class="hljs-keyword">add_subdirectory</span>(path_to_dir)</code></pre>
 <p>You will also probably want to add its headers using
 <code>target_include_directories</code>, like mentioned before.</p>
-<p>The naming scheme for linking these is usually pretty confusing,.
-Some examples of what I actually use:</p>
+<p>The naming scheme for linking these is usually pretty confusin,. Some
+examples of what I actually use:</p>
 <pre class="cmake"><code data-highlighted="yes" class="hljs language-cmake"><span class="hljs-keyword">target_link_libraries</span>(MyExecutable
     glfw
     EnTT::EnTT
@@ -153,9 +153,9 @@ Some examples of what I actually use:</p>
     sndfile
     ...
 )</code></pre>
-<p>There might be a reason for some of them having different names, but
-I don’t really care enough. Usually the docs of the library specify how
-you should do it.</p>
+<p>There is probably a good reason for some of them having different
+names, but I don’t really care enough. Usually the docs of the library
+specify how you should do it.</p>
 <h3 id="already-packaged-in-your-system">Already packaged in your
 system</h3>
 <p>Libraries which are already packaged are extremely easy to use. For
@@ -176,8 +176,8 @@ with</p>
 <p><strong>NOTE</strong> see the next section for more details on
 this.</p>
 <p>For binary only, you need to tell cmake where its headers are, like I
-described somewhere above. I also like to place the binary files in the
-build directory, if they are dynamic:</p>
+described above. I also like to place the binary files in the build
+directory, if they are dynamic:</p>
 <pre class="cmake"><code data-highlighted="yes" class="hljs language-cmake"><span class="hljs-keyword">if</span> (<span class="hljs-keyword">NOT</span> <span class="hljs-keyword">EXISTS</span> <span class="hljs-variable">${CMAKE_BINARY_DIR}</span>/somebinary)
     <span class="hljs-keyword">file</span>(COPY path_to_binary DESTINATION <span class="hljs-variable">${CMAKE_BINARY_DIR}</span>)
 <span class="hljs-keyword">endif</span>()</code></pre>
@@ -191,31 +191,37 @@ files there:</p>
 <p>When you link your executable against a static library, the code for
 the static library is now embedded in your executable and you no longer
 need the external library for it to run.</p>
-<p>Advantages: * Simpler, no need to bundle the external library with
-your application * Faster, allows optimizations</p>
+<p>Advantages:</p>
+<ul>
+<li>Simpler, no need to bundle the external library with your
+application</li>
+<li>Faster, allows optimizations</li>
+</ul>
 <p>Using a dynamic library, you need the binary file to be present
 whenever you execute the application, and the code is not embedded into
 your executable.</p>
-<p>Advantages: * To update the library, you just have to replace the
-binary * Smaller size of main executable</p>
-<p>When a library is linked statically, it can only be linked against
-your executable (its code ‘added’ to your own), and vice versa for
-dynamically linked ones.</p>
+<p>Advantages:</p>
+<ul>
+<li>To update the library, you just have to replace the binary</li>
+<li>Smaller size of main executable</li>
+</ul>
+<p>You cannot statically link against a binary that is meant for dynamic
+linking, and vice versa, the binaries are different.</p>
 <p>On linux, statically linked files are named
 <code>&lt;name&gt;.a</code> while dynamic ones are
 <code>&lt;name&gt;.so</code>.</p>
 <p>On windows things are exponencially more confusing. Dynamically
 linked files are named ‘<name>.dll’. Statically linked files are
 sometimes named <code>&lt;name&gt;.lib</code>, or
-<code>&lt;name&gt;.dll.a</code>, or <code>&lt;name&gt;.a</code>. While
-on linux a .so file is all you need to dynamically link against a
-library, windows needs both the .dll and a .lib file, but the .lib file
-is only required when linking against your executable and never again.
-This does seem confusing, but wait for it. The .lib file you use to link
-the .dll is not the same as the one you use for statically linking. Why
-would someone ever do this?? To dinstinguish them, usually they are in a
-folder with static in its name, or a <code>.dll.a/.dll.lib</code>
-instantly tells you it is meant for dynamic linking.</name></p>
+<code>&lt;name&gt;.dll.a</code>. While on linux a .so file is all you
+need to dynamically link against a library, windows needs both the .dll
+and a .lib file, but the .lib file is only required when linking against
+your executable and never again. This does seem confusing, but wait for
+it. The .lib file you use to link the .dll is not the same as the one
+you use for static linking. Why would someone ever do this?? To
+dinstinguish them, usually they are in a folder with static in its name,
+or a <code>.dll.a/.dll.lib</code> instantly tells you it is meant for
+dynamic linking.</name></p>
 <p>To sum up how I do things:</p>
 <ul>
 <li>Static files: add their path to the link directories:</li>
@@ -226,20 +232,25 @@ instantly tells you it is meant for dynamic linking.</name></p>
 <ul>
 <li>Dynamic files on linux:</li>
 </ul>
-<p>Copy them to the cmake binary dir and link that dir, as described <a href="#static-vs-dynamic-linking">in the section above</a></p>
+<p>Copy them to the cmake binary dir and link that dir, as described <a href="#binary-only-or-binary-is-the-only-convenient-option">in the
+section above</a></p>
 <ul>
 <li>Dynamic files on windows:</li>
 </ul>
 <p>Same as linux, but also use <code>target_link_directories</code> to
-add the location of the .lib files (the .lib files meant for static
+add the location of the .lib files (the .lib files meant for dynamic
 linking, not the other .lib files. What a mess)</p>
 <p>In the end, add the libraries using their name. For example, the
 steam dll is named steam_api64.dll, so I link it like</p>
-<p>target_link_libraries(MyExecutable … steam_api64 … )</p>
-<p>This is more a rule of thumb for dynamically linked libraries, as the
-naming schemes for other ones are usually all over the place. Maybe the
-name is lib_something.a yet all you need is to link ‘something’. It’s a
-mess.</p>
+<pre class="cmake"><code data-highlighted="yes" class="hljs language-cmake"><span class="hljs-keyword">target_link_libraries</span>(MyExecutable
+    ...
+    steam_api64
+    ...
+)</code></pre>
+<p>This is more of a rule of thumb for dynamically linked libraries, as
+the naming schemes for static ones are usually all over the place. Maybe
+the name is libsomething.a yet all you need is to link ‘something’. It’s
+a mess.</p>
 <h2 id="ipo">IPO</h2>
 <p>Interprocedural optimizations are optimizations that happen when
 linking. You can enable them by doing</p>
@@ -248,7 +259,6 @@ check_ipo_supported(RESULT result)
 <span class="hljs-keyword">if</span> (result)
     <span class="hljs-keyword">message</span>(STATUS <span class="hljs-string">"Using IPO"</span>)
     <span class="hljs-keyword">set</span>(CMAKE_INTERPROCEDURAL_OPTIMIZATION <span class="hljs-keyword">ON</span>)
-    <span class="hljs-comment"># set_property(TARGET foo PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)</span>
 <span class="hljs-keyword">else</span>(result)
     <span class="hljs-keyword">message</span>(FATAL_ERROR <span class="hljs-string">"IPO not supported :)"</span>)
 <span class="hljs-keyword">endif</span>(result)</code></pre>
@@ -307,8 +317,9 @@ dynamically linked libraries I use causes no issues, as they are usually
 already stripped.</p>
 <p>Example:</p>
 <pre class="bash"><code data-highlighted="yes" class="hljs language-bash">strip --strip-unneeded &lt;executable or binary file&gt;</code></pre>
-<p>YOu can also do <code>--strip-all</code>, but this might break some
-files, usually preventing them from being linkable.</p>
+<p>You can also do <code>--strip-all</code>, but this might break some
+files. For example, you might end up with a .so file that can no longer
+be linked against.</p>
 <p><strong>NOTE:</strong> Use the manpages in your own device. Do no
 search <code>man strip</code> on google.</p>
   <div class="debug-grid"></div>

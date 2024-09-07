@@ -137,7 +137,7 @@ sub {
 table {
   position: relative;
   top: calc(var(--line-height) / 2);
-  width: calc(round(down, 100%, 1ch));
+  /* width: calc(round(down, 100%, 1ch)); this makes it 1 column shorter, but it makes it wrong, wtf */
   border-collapse: collapse;
   margin: 0 0 calc(var(--line-height) * 2);
 }
@@ -181,7 +181,7 @@ th {
 p {
   word-break: break-word;
   word-wrap: break-word;
-  hyphens: auto;
+  hyphens: none; /* auto */
 }
 
 img, video {
@@ -477,6 +477,7 @@ label input {
 
 .button-grid {
 	flex-wrap: wrap;
+	justify-content: space-evenly;
 }
 
 .box-button {
