@@ -1,0 +1,152 @@
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+  <meta charset="utf-8">
+  <meta name="generator" content="pandoc">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Marching Cubes devlog</title>
+  <link rel="stylesheet" href="styles/reset.css">
+  <link rel="stylesheet" href="styles/hljs/github-dark.min.css">
+  <link rel="stylesheet" href="styles/index.css">
+</head>
+<body>
+<table class="header">
+  <tbody><tr>
+    <td rowspan="2" class="width-auto">
+      <h1 class="title">Marching Cubes devlog</h1>
+      <span class="subtitle">Marching Models</span>
+    </td>
+	<td>
+		<a href="index">Main page</a>
+	</td>
+  </tr>
+  <tr>
+    <td class="width-min">
+		<span style="white-space: pre;">Updated: 9/2024</span>
+	</td>
+  </tr>
+</tbody></table>
+<label class="debug-toggle-label"><input type="checkbox" class="debug-toggle"> Debug mode</label>
+<nav id="TOC" role="doc-toc">
+<!--  -->
+<ul>
+<li><a href="#how">How</a></li>
+<li><a href="#embree">Embree</a></li>
+</ul>
+</nav>
+<p>I wanted to add a way of loading models from blender as actual
+marching cubes geometry.</p>
+<h1 id="how">How</h1>
+<p>First, I needed some way of determining if a point is inside or
+outside of the model. I already use assimp to load the model into
+triangles, so really all I need is to figure out if a point is inside a
+mesh.</p>
+<p>After some research, I saw I should trace a ray in a random
+direction. If it intersects the geometry an even number of times, it is
+outside. If the number is uneven, then the point is inside the mesh. But
+how do I actually do this ray tracing?</p>
+<h1 id="embree">Embree</h1>
+<p>Much like when implementing physics, I quickly discovered I should
+probably rely on some external library, as the algorithms are not
+trivial at all. I settled on <a href="https://github.com/RenderKit/embree">embree</a>, as it seemed very
+simple to do what I needed.</p>
+<p>Unfortunately their website is on embree 3 while the code is on
+embree 4, so I had to dig into the code and the release notes to see
+what I needed to use. In the end, I managed to make this example:</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp"><span class="hljs-comment">// setup</span>
+RTCDevice device = <span class="hljs-built_in">rtcNewDevice</span>(<span class="hljs-literal">nullptr</span>);
+<span class="hljs-comment">// check if device is null...</span>
+RTCScene scene = <span class="hljs-built_in">rtcNewScene</span>(device);
+RTCGeometry mesh = <span class="hljs-built_in">rtcNewGeometry</span>(device, RTC_GEOMETRY_TYPE_TRIANGLE);
+
+<span class="hljs-comment">// add vertices and indices</span>
+<span class="hljs-type">float</span>* vertexBuffer = (<span class="hljs-type">float</span>*)<span class="hljs-built_in">rtcSetNewGeometryBuffer</span>(mesh, RTC_BUFFER_TYPE_VERTEX, <span class="hljs-number">0</span>, RTC_FORMAT_FLOAT3, <span class="hljs-built_in">sizeof</span>(glm::vec3), vertices.<span class="hljs-built_in">size</span>());
+std::<span class="hljs-built_in">memcpy</span>(vertexBuffer, vertices.<span class="hljs-built_in">data</span>(), <span class="hljs-built_in">sizeof</span>(glm::vec3) * vertices.<span class="hljs-built_in">size</span>());
+
+<span class="hljs-type">unsigned</span> <span class="hljs-type">int</span>* indexBuffer = (<span class="hljs-type">unsigned</span> <span class="hljs-type">int</span>*)<span class="hljs-built_in">rtcSetNewGeometryBuffer</span>(mesh, RTC_BUFFER_TYPE_INDEX, <span class="hljs-number">0</span>, RTC_FORMAT_UINT3, <span class="hljs-number">3</span> * <span class="hljs-built_in">sizeof</span>(<span class="hljs-type">unsigned</span> <span class="hljs-type">int</span>), indices.<span class="hljs-built_in">size</span>() / <span class="hljs-number">3</span>);
+std::<span class="hljs-built_in">memcpy</span>(indexBuffer, indices.<span class="hljs-built_in">data</span>(), <span class="hljs-built_in">sizeof</span>(<span class="hljs-type">unsigned</span> <span class="hljs-type">int</span>) * indices.<span class="hljs-built_in">size</span>());
+
+<span class="hljs-comment">// Commit geometry changes</span>
+<span class="hljs-built_in">rtcCommitGeometry</span>(mesh);
+<span class="hljs-built_in">rtcAttachGeometry</span>(scene, mesh);
+<span class="hljs-built_in">rtcReleaseGeometry</span>(mesh);
+
+<span class="hljs-comment">// Commit scene changes</span>
+<span class="hljs-built_in">rtcCommitScene</span>(scene);
+
+<span class="hljs-built_in">intersect</span>(.....);
+
+<span class="hljs-comment">// cleanup</span>
+<span class="hljs-built_in">rtcReleaseScene</span>(scene);
+<span class="hljs-built_in">rtcReleaseDevice</span>(device);</code></pre>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp"><span class="hljs-function"><span class="hljs-type">unsigned</span> <span class="hljs-type">int</span> <span class="hljs-title">intersect</span><span class="hljs-params">(...)</span> </span>{
+    <span class="hljs-comment">// Ray structure</span>
+    RTCRayHit rayHit;
+    rayHit.ray.org_x = ...;
+    rayHit.ray.org_y = ...;
+    rayHit.ray.org_z = ...;
+
+    rayHit.ray.dir_x = ...;
+    rayHit.ray.dir_y = ...;
+    rayHit.ray.dir_z = ...;
+
+    <span class="hljs-comment">// example values</span>
+    rayHit.ray.tnear = <span class="hljs-number">0.0f</span>;
+    rayHit.ray.tfar = std::numeric_limits&lt;<span class="hljs-type">float</span>&gt;::<span class="hljs-built_in">infinity</span>();
+
+    <span class="hljs-comment">// example values</span>
+    rayHit.ray.time = <span class="hljs-number">0.0f</span>;    <span class="hljs-comment">// Time of the ray for motion blur</span>
+    rayHit.ray.mask = <span class="hljs-number">-1</span>;      <span class="hljs-comment">// Mask to select geometry</span>
+    rayHit.ray.id = <span class="hljs-number">0</span>;         <span class="hljs-comment">// Ray ID</span>
+    rayHit.ray.flags = <span class="hljs-number">0</span>;      <span class="hljs-comment">// Flags</span>
+
+
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">int</span> intersections = <span class="hljs-number">0</span>;
+
+    <span class="hljs-comment">// ugly but works</span>
+    <span class="hljs-keyword">while</span> (<span class="hljs-literal">true</span>) {
+        <span class="hljs-comment">// reset hit struct</span>
+        rayHit.hit.geomID = RTC_INVALID_GEOMETRY_ID;
+        rayHit.hit.primID = RTC_INVALID_GEOMETRY_ID;
+        rayHit.hit.instID[<span class="hljs-number">0</span>] = RTC_INVALID_GEOMETRY_ID;
+
+        <span class="hljs-built_in">rtcIntersect1</span>(scene, &amp;rayHit);
+        <span class="hljs-keyword">if</span> (rayHit.hit.geomID != RTC_INVALID_GEOMETRY_ID) {
+            <span class="hljs-comment">// here, ray has intersected</span>
+            intersections++;
+
+            <span class="hljs-comment">// move the ray forward a bit so it doesn't intersect the same point over and over again</span>
+            rayHit.ray.org_x += rayHit.ray.tfar + EPSILON;
+
+            rayHit.ray.tfar = ...; <span class="hljs-comment">// reset far distance, sice it was changed to give us the result</span>
+        } <span class="hljs-keyword">else</span> {
+            <span class="hljs-keyword">break</span>;
+        }
+    }
+
+    <span class="hljs-keyword">return</span> intersections;
+}</code></pre>
+<p>Visualizing the results from this funcion at intersecting a sphere,
+in blender:</p>
+<div class="grid pictures-grid">
+<div class="border pictures-grid-element">
+<p>
+The left cube is the ray origin, the other one is the first intersection
+with the sphere
+</p><p>
+<img src="Pictures/ray1.png">
+</p></div>
+<div class="grid pictures-grid">
+<div class="border pictures-grid-element">
+<p>
+The next intersection happened at the other side of the sphere
+</p>
+<p><img src="Pictures/ray2.png"> <img src="Pictures/ray3.png"></p>
+</div>
+</div>
+</div>
+  <div class="debug-grid"></div>
+  <script src="scripts/index.js"></script>
+
+<footer>
+</footer>
+
+</body></html>

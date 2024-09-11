@@ -281,7 +281,7 @@ ol li:before {
 }
 
 li {
-  margin: 0;
+  margin: 0 0 var(--line-height) 0;
   padding: 0;
 }
 
@@ -476,8 +476,11 @@ label input {
   } */
 
 .button-grid {
+	display: flex;
+	flex-direction: row;
 	flex-wrap: wrap;
-	justify-content: space-evenly;
+	justify-content: flex-start;
+	gap: 1ch;
 }
 
 .box-button {
@@ -554,4 +557,9 @@ label input {
 	/* align-items: center; */
 	/* aspect-ratio: 1 / 1; */
 	justify-content: space-between;
+}
+
+/* override for the padding in code blocks */
+pre code.hljs {
+	padding: var(--line-height) 1ch var(--line-height) 1ch;
 }
