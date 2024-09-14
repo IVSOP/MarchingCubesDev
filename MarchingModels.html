@@ -34,7 +34,7 @@
 </nav>
 <p>I wanted to add a way of loading models from blender as actual
 marching cubes geometry.</p>
-<h1 id="how">How</h1>
+<h2 id="how">How</h2>
 <p>First, I needed some way of determining if a point is inside or
 outside of the model. I already use assimp to load the model into
 triangles, so really all I need is to figure out if a point is inside a
@@ -43,7 +43,7 @@ mesh.</p>
 direction. If it intersects the geometry an even number of times, it is
 outside. If the number is uneven, then the point is inside the mesh. But
 how do I actually do this ray tracing?</p>
-<h1 id="embree">Embree</h1>
+<h2 id="embree">Embree</h2>
 <p>Much like when implementing physics, I quickly discovered I should
 probably rely on some external library, as the algorithms are not
 trivial at all. I settled on <a href="https://github.com/RenderKit/embree">embree</a>, as it seemed very

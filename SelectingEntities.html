@@ -1,0 +1,172 @@
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+  <meta charset="utf-8">
+  <meta name="generator" content="pandoc">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Marching Cubes devlog</title>
+  <link rel="stylesheet" href="styles/reset.css">
+  <link rel="stylesheet" href="styles/hljs/github-dark.min.css">
+  <link rel="stylesheet" href="styles/index.css">
+</head>
+<body>
+<table class="header">
+  <tbody><tr>
+    <td rowspan="2" class="width-auto">
+      <h1 class="title">Marching Cubes devlog</h1>
+      <span class="subtitle">Selecting entities</span>
+    </td>
+	<td>
+		<a href="index">Main page</a>
+	</td>
+  </tr>
+  <tr>
+    <td class="width-min">
+		<span style="white-space: pre;">Updated: 9/2024</span>
+	</td>
+  </tr>
+</tbody></table>
+<label class="debug-toggle-label"><input type="checkbox" class="debug-toggle"> Debug mode</label>
+<nav id="TOC" role="doc-toc">
+<!--  -->
+<ul>
+<li><a href="#what-are-you-looking-at">What are you looking at</a></li>
+<li><a href="#jph-ray-casting">JPH ray casting</a></li>
+<li><a href="#connecting-this-to-ecs">Connecting this to ECS</a></li>
+<li><a href="#drawing-an-outline">Drawing an outline</a></li>
+</ul>
+</nav>
+<p>To actually make a game, I need to be able to interact with the
+entities. I decided a good first step would be to show the player when
+one or more of them are selected.</p>
+<h2 id="what-are-you-looking-at">What are you looking at</h2>
+<p>But how do I know that the player is actually looking at an entity? I
+know about a method that involves using a depth buffer or something
+similar, where you write the ID of the entity in all pixels it takes up.
+This seems useful for selecting an entity with the mouse, but for now I
+decided to go with a simpler solution. However, I might implement it in
+the future, and update this post.</p>
+<p>I remember seeing that Jolt Physics (the physics engine I use) had
+some methods for ray casting in the scene, and I think it makes sense to
+use the entities’ hitbox instead of the entire model to detect
+selection. So, that’s what I’ll use.</p>
+<h2 id="jph-ray-casting">JPH ray casting</h2>
+<p>Jolt enables you to ray cast in the narrow phase, broad phase, inside
+shapes, using several options and filters, …</p>
+<p>These are the features I found the most useful:</p>
+<ul>
+<li>Ray casting in the broad phase</li>
+</ul>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp">RayCast ray {origin, direction_and_len}; <span class="hljs-comment">// direction_and_len is basically dir * len, if dir is a normalized direction</span>
+ClosestHitCollisionCollector&lt;RayCastBodyCollector&gt; collector; <span class="hljs-comment">// there are other collectors available</span>
+physSystem-&gt;<span class="hljs-built_in">GetBroadPhaseQuery</span>().<span class="hljs-built_in">CastRay</span>(ray, collector);
+<span class="hljs-keyword">return</span> collector.mHit.mBodyID; <span class="hljs-comment">// return the ID of the body that was hit. it no body was hit, id.IsInvalid() == true</span></code></pre>
+<ul>
+<li>Ray casting in the narrow phase</li>
+</ul>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp">RRayCast ray {origin, direction_and_len}; <span class="hljs-comment">// RRay and not Ray for some reason</span>
+RayCastResult res;
+physSystem-&gt;<span class="hljs-built_in">GetNarrowPhaseQuery</span>().<span class="hljs-built_in">CastRay</span>(ray, res);
+<span class="hljs-keyword">return</span> res.mBodyID;</code></pre>
+<ul>
+<li>Narrow phase using a filter</li>
+</ul>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp"><span class="hljs-comment">// Custom BroadPhaseLayerFilter that excludes the NON_MOVING layer of the broadphase</span>
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">RayBroadPhaseFilter</span> : <span class="hljs-keyword">public</span> JPH::BroadPhaseLayerFilter
+{
+<span class="hljs-keyword">public</span>:
+    JPH::BroadPhaseLayer excluded_layer = BroadPhaseLayers::NON_MOVING;
+
+    <span class="hljs-built_in">RayBroadPhaseFilter</span>() = <span class="hljs-keyword">default</span>;
+
+    <span class="hljs-function"><span class="hljs-keyword">virtual</span> <span class="hljs-type">bool</span> <span class="hljs-title">ShouldCollide</span><span class="hljs-params">(JPH::BroadPhaseLayer layer)</span> <span class="hljs-type">const</span> <span class="hljs-keyword">override</span>
+    </span>{
+        <span class="hljs-keyword">return</span> layer != excluded_layer; <span class="hljs-comment">// will only return if the layer is not NON_MOVING</span>
+    }
+};
+
+...
+RayBroadPhaseFilter filter;
+physSystem-&gt;<span class="hljs-built_in">GetNarrowPhaseQuery</span>().<span class="hljs-built_in">CastRay</span>(ray, res, filter);
+...</code></pre>
+<h2 id="connecting-this-to-ecs">Connecting this to ECS</h2>
+<p><strong>Note:</strong> In Jolt Physics, you can use a
+<code>Body*</code> to access attributes of a body directly. The ray
+casting functions return a <code>BodyID</code>. By using the
+BodyInterface, you can do anything you could do with a
+<code>Body*</code>, or you can actually just get the <code>Body*</code>.
+I will not specify if I am using <code>Body*</code> or
+<code>BodyID</code> since the functions are the same.</p>
+<p>Now that I have the BodyID, what do I do with it? Turns out you can
+set user data by using SetUserData(uint64), and retrieve it with
+GetUserData(…). 64 bits is enough to fit an entire pointer on a modern
+machine, but I just used the entt::entity since it is a 32 bit
+number.</p>
+<p>Now that I know what entity the body belongs to, I add the
+<code>Selected</code> component to it. This way, I can iterate over all
+selected entities and do whatever I want with them.</p>
+<p>However, the other places I use entt now need to ignore selected
+entities. This can be done by doing, for example,</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp"><span class="hljs-keyword">auto</span> group = registry.group&lt;&gt;(entt::get&lt;Render, Physics&gt;, entt::exclude&lt;Selected&gt;);</code></pre>
+<p>I was now able to send the selected entities to a different render
+function. Here, I make the selected entity red. Only one is selected at
+a time, since the <code>Selected</code> component is removed once the
+entity is processed.</p>
+<p><img class="border" src="Pictures/select1.png">
+<img class="border" src="Pictures/select2.png"></p>
+<h2 id="drawing-an-outline">Drawing an outline</h2>
+<p>Now I wanted to actually draw an outline around the selected
+entities. I read somewhere that I should use stencil buffers for this
+and, like always, the 🐐 has <a href="https://learnopengl.com/Advanced-OpenGL/Stencil-testing">a
+tutorial</a>.</p>
+<p>However, my rendering pipeline is much more complicated. I render
+many things independently from each other, have an HDR framebuffer that
+I have to manage and resize manually, …</p>
+<p>When trying to implement this, I somehow messed up the GPU memory so
+bad that I started seeing spots like the screen was dirty, and crashed
+the entire pc. After fixing that, I had issues clearing the stencil
+buffer, making everything look extremely buggy:</p>
+<p><img class="border" src="Pictures/select3.png"></p>
+<p>Finally, I found the right magic combination of OpenGL commands to
+render things correctly:</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp"><span class="hljs-comment">// clearing the framebuffer at the start of the frame</span>
+<span class="hljs-comment">// added GL_STENCIL_BUFFER_BIT, and this function to allow writting to all bits, otherwise nothing happens</span>
+<span class="hljs-built_in">glStencilMask</span>(<span class="hljs-number">0xFF</span>);
+<span class="hljs-built_in">glClear</span>(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+...
+
+<span class="hljs-comment">// rendering of the selected entities</span>
+
+<span class="hljs-comment">// setup stencil</span>
+<span class="hljs-built_in">glEnable</span>(GL_STENCIL_TEST);
+<span class="hljs-comment">// Configure stencil to write operation</span>
+<span class="hljs-built_in">glStencilOp</span>(GL_KEEP, GL_KEEP, GL_REPLACE);
+<span class="hljs-built_in">glStencilFunc</span>(GL_ALWAYS, <span class="hljs-number">1</span>, <span class="hljs-number">0xFF</span>); <span class="hljs-comment">// Always pass the stencil test</span>
+<span class="hljs-built_in">glStencilMask</span>(<span class="hljs-number">0xFF</span>); <span class="hljs-comment">// Enable writing to the stencil buffer</span>
+
+<span class="hljs-built_in">draw_objects_like_normal</span>();
+
+<span class="hljs-built_in">glStencilFunc</span>(GL_NOTEQUAL, <span class="hljs-number">1</span>, <span class="hljs-number">0xFF</span>);
+<span class="hljs-built_in">glStencilMask</span>(<span class="hljs-number">0x00</span>);
+<span class="hljs-built_in">glDisable</span>(GL_DEPTH_TEST);
+
+<span class="hljs-comment">/*
+draw the same objects. I decided to draw them slightly bigger using a model matrix,
+and a simple shader that outputs a green color. You can also offset the vertices
+using the normal.
+*/</span>
+glm::mat4 model = glm::<span class="hljs-built_in">scale</span>(glm::<span class="hljs-built_in">mat4</span>(<span class="hljs-number">1.0f</span>), glm::<span class="hljs-built_in">vec3</span>(<span class="hljs-number">1.1f</span>, <span class="hljs-number">1.1f</span>, <span class="hljs-number">1.1f</span>));
+<span class="hljs-built_in">draw_objects_with_outline_shader</span>(model)
+
+<span class="hljs-comment">// cleanup stencil, so that other draw calls don't use it</span>
+<span class="hljs-built_in">glDisable</span>(GL_STENCIL_TEST);
+<span class="hljs-built_in">glEnable</span>(GL_DEPTH_TEST);</code></pre>
+<p>This was the result:</p>
+<video class="border" src="Videos/select1.mp4" controls="">
+</video>
+  <div class="debug-grid"></div>
+  <script src="scripts/index.js"></script>
+
+<footer>
+</footer>
+
+</body></html>

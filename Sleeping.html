@@ -37,7 +37,7 @@
 certain FPS target, or to have the physics on a fixed timestep.</p>
 <p>For example, if you want 60hz (16.6ms) but you take 10ms to compute
 everything, you could just sleep 6.6ms.</p>
-<h1 id="early-implementation">Early implementation</h1>
+<h2 id="early-implementation">Early implementation</h2>
 <p>Sleeping with <code>sleep()</code> is bad since it is done for
 seconds at a time. However, you have some functions like
 <code>usleep()</code> and <code>nanosleep()</code>.</p>
@@ -46,7 +46,7 @@ appart on other platforms, making the framerate vary wildly.</p>
 <p>You would think this would either be easy or that many people have
 had this problem since many games use sleeping, but apparently not. I
 even asked on reddit and got told to just use vsync (what???????)</p>
-<h1 id="the-tests">The tests</h1>
+<h2 id="the-tests">The tests</h2>
 <p>Long story short, I setup a lot of tests to see what was going
 on:</p>
 <pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;chrono&gt;</span></span>
@@ -102,7 +102,7 @@ __asm__ __volatile__( <span class="hljs-string">"nop"</span> : : : <span class="
 _mm_pause();
 
 __asm__ __volatile__( <span class="hljs-string">"pause"</span> );</code></pre>
-<h1 id="conclusions">Conclusions</h1>
+<h2 id="conclusions">Conclusions</h2>
 <ul>
 <li>spinloops take a REALLY small time and used the CPU to the max</li>
 <li>sleep functions were good at 1ms and could even go to around
