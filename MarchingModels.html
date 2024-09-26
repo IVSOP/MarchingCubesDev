@@ -30,6 +30,10 @@
 <ul>
 <li><a href="#how">How</a></li>
 <li><a href="#embree">Embree</a></li>
+<li><a href="#loading-it-into-the-world">Loading it into the
+world</a></li>
+<li><a href="#results">Results</a></li>
+<li><a href="#future-improvements">Future improvements</a></li>
 </ul>
 </nav>
 <p>I wanted to add a way of loading models from blender as actual
@@ -143,6 +147,94 @@ The next intersection happened at the other side of the sphere
 </div>
 </div>
 </div>
+<h2 id="loading-it-into-the-world">Loading it into the world</h2>
+<p>To keep it simple, I just store the results like this:</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp"><span class="hljs-type">uint32_t</span> len_x, len_y, len_z; <span class="hljs-comment">// len of the grid dimentions</span>
+<span class="hljs-type">bool</span> *corners; <span class="hljs-comment">// [y][z][x] grid of boolean values</span></code></pre>
+<p>To load this into the world:</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp"><span class="hljs-keyword">for</span> (<span class="hljs-type">uint32_t</span> y = <span class="hljs-number">0</span>; y &lt; obj.len_y; y++) {
+    <span class="hljs-keyword">for</span> (<span class="hljs-type">uint32_t</span> z = <span class="hljs-number">0</span>; z &lt; obj.len_z; z++) {
+        <span class="hljs-keyword">for</span> (<span class="hljs-type">uint32_t</span> x = <span class="hljs-number">0</span>; x &lt; obj.len_x; x++) {
+            <span class="hljs-keyword">switch</span> (obj.<span class="hljs-built_in">get</span>(x, y, z)) {
+                <span class="hljs-keyword">case</span> <span class="hljs-literal">true</span>:
+                    <span class="hljs-built_in">setBit</span>(pos + glm::<span class="hljs-built_in">ivec3</span>(x, y, z));
+                    <span class="hljs-keyword">break</span>;
+                <span class="hljs-keyword">case</span> <span class="hljs-literal">false</span>:
+                    <span class="hljs-built_in">learBit</span>(pos + glm::<span class="hljs-built_in">ivec3</span>(x, y, z));
+                    <span class="hljs-keyword">break</span>;
+            }
+        }
+    }
+}</code></pre>
+<p>Basically, I just iterate over each corner and set it in the
+world.</p>
+<p>The setBit function is pretty simple:</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp"><span class="hljs-comment">// sometimes a corner 'belongs' to many chunks, that is,</span>
+<span class="hljs-comment">// its position needs to be set in more than one chunk</span>
+<span class="hljs-comment">// so I add +-1 just to guarantee that if needed neighbor chunks will be checked</span>
+<span class="hljs-keyword">for</span> (<span class="hljs-type">int</span> x = <span class="hljs-number">-1</span>; x &lt;= <span class="hljs-number">1</span>; x++) {
+    <span class="hljs-keyword">for</span> (<span class="hljs-type">int</span> y = <span class="hljs-number">-1</span>; y &lt;= <span class="hljs-number">1</span>; y++) {
+        <span class="hljs-keyword">for</span> (<span class="hljs-type">int</span> z = <span class="hljs-number">-1</span>; z &lt;= <span class="hljs-number">1</span>; z++) {</code></pre>
+<p>Get the chunk it belongs to:</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp"><span class="hljs-comment">// I use an array of chunks for now. I have to do weird math due to (0,0,0) being at a negative corner of the world and not the center</span>
+<span class="hljs-comment">// since I do +-1 above this, I could end up on chunks that do not exist, so I have to clamp the result</span>
+<span class="hljs-comment">// the index is a GLuint, so clamp to 0 is free, but not the clamp to MAX</span>
+<span class="hljs-comment">// instead of calling clamp() and providing the minimum value for no reason,</span>
+<span class="hljs-comment">// I can just do &amp; MASK to set the bits belonging to large numbers to 0 </span>
+Chunk *chunk = &amp;chunks
+    [(<span class="hljs-built_in">static_cast</span>&lt;GLuint&gt;((<span class="hljs-built_in">static_cast</span>&lt;GLfloat&gt;(position.x) / CHUNK_SIZE_CORNERS_FLOAT) + (WORLD_SIZE_X_FLOAT / <span class="hljs-number">2.0f</span>)) + x) &amp; WORLD_SIZE_X_MASK]
+    [(<span class="hljs-built_in">static_cast</span>&lt;GLuint&gt;((<span class="hljs-built_in">static_cast</span>&lt;GLfloat&gt;(position.y) / CHUNK_SIZE_CORNERS_FLOAT) + (WORLD_SIZE_Y_FLOAT / <span class="hljs-number">2.0f</span>)) + y) &amp; WORLD_SIZE_Y_MASK]
+    [(<span class="hljs-built_in">static_cast</span>&lt;GLuint&gt;((<span class="hljs-built_in">static_cast</span>&lt;GLfloat&gt;(position.z) / CHUNK_SIZE_CORNERS_FLOAT) + (WORLD_SIZE_Z_FLOAT / <span class="hljs-number">2.0f</span>)) + z) &amp; WORLD_SIZE_Z_MASK];</code></pre>
+<p>Now, given this chunk, get the relative position inside it:</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp">
+<span class="hljs-type">const</span> glm::ivec3 chunkpos = <span class="hljs-built_in">getChunkCoords</span>(chunk);
+
+<span class="hljs-comment">// all I have to do is subtract the world position from the position of the chunk in the world</span>
+<span class="hljs-type">const</span> glm::ivec3 relpos = position - chunkpos;
+
+<span class="hljs-comment">// could happen that it does not belong to the chunk, so I have to do this check</span>
+<span class="hljs-type">const</span> glm::u8vec3 finalpos = glm::<span class="hljs-built_in">u8vec3</span>(relpos);
+    <span class="hljs-comment">// check if the position is actually inside the chunk</span>
+    <span class="hljs-keyword">if</span> (finalpos.x &gt; CHUNK_SIZE || finalpos.y &gt; CHUNK_SIZE || finalpos.z &gt; CHUNK_SIZE) {
+        <span class="hljs-comment">// then it does not belong to this chunk, do nothing</span>
+    } <span class="hljs-keyword">else</span> {
+        chunk-&gt;<span class="hljs-built_in">addCornerAt</span>(finalpos, <span class="hljs-number">1</span>);
+    }
+}</code></pre>
+<h2 id="results">Results</h2>
+<p>Loading a sphere <img class="border" src="Pictures/ray15.png"></p>
+<p>Loading the cone monkey
+<img class="border" src="Pictures/ray13.png">
+<img class="border" src="Pictures/ray14.png"></p>
+<details>
+<summary>
+Bugs
+</summary>
+<div class="grid pictures-grid">
+<div class="border pictures-grid-element">
+<p><img src="Pictures/ray4.png"> <img src="Pictures/ray5.png">
+<img src="Pictures/ray6.png"> <img src="Pictures/ray7.png">
+<img src="Pictures/ray8.png"> <img src="Pictures/ray9.png">
+<img src="Pictures/ray10.png"></p>
+</div>
+<div class="grid pictures-grid">
+<div class="border pictures-grid-element">
+<p>
+Complex geometry has holes due to random chance of the rays hitting it
+at that spot or not, unsure how to fix for now. Maybe send N rays all in
+random directions?
+</p>
+<p><img src="Pictures/ray11.png"> <img src="Pictures/ray12.png"></p>
+</div>
+</div>
+</div>
+</details>
+<h2 id="future-improvements">Future improvements</h2>
+<p>As you can see, everything in the implementation is terrible. It was
+actually more difficult than I expected, so I prioritized doing it the
+easy way so it could get done at all. In the future I think I can
+optimize this heavily if needed, starting by setting the bits up to 32
+at once doing bitwise operations, instead of setting them 1 by 1.</p>
   <div class="debug-grid"></div>
   <script src="scripts/index.js"></script>
 
