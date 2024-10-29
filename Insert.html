@@ -1,0 +1,173 @@
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+  <meta charset="utf-8">
+  <meta name="generator" content="pandoc">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Marching Cubes devlog</title>
+  <link rel="stylesheet" href="styles/reset.css">
+  <link rel="stylesheet" href="styles/hljs/github-dark.min.css">
+  <link rel="stylesheet" href="styles/index.css">
+</head>
+<body>
+<table class="header">
+  <tbody><tr>
+    <td rowspan="2" class="width-auto">
+      <h1 class="title">Marching Cubes devlog</h1>
+      <span class="subtitle">Inserting entities</span>
+    </td>
+	<td>
+		<a href="index">Main page</a>
+	</td>
+  </tr>
+  <tr>
+    <td class="width-min">
+		<span style="white-space: pre;">Updated: 9/2024</span>
+	</td>
+  </tr>
+</tbody></table>
+<label class="debug-toggle-label"><input type="checkbox" class="debug-toggle"> Debug mode</label>
+<nav id="TOC" role="doc-toc">
+<!--  -->
+<ul>
+<li><a href="#the-problem">The problem</a></li>
+<li><a href="#the-solution">The solution</a>
+<ul>
+<li><a href="#get-the-position-you-want-to-place-it-at">Get the position
+you want to place it at</a></li>
+<li><a href="#apply-vertical-offset-so-that-shape-is-on-the-ground">Apply
+vertical offset so that shape is on the ground</a></li>
+<li><a href="#check-if-it-can-be-placed">Check if it can be
+placed</a></li>
+</ul></li>
+<li><a href="#results">Results</a></li>
+<li><a href="#problems">Problems</a></li>
+</ul>
+</nav>
+<h2 id="the-problem">The problem</h2>
+<p>In a nutshell, I need a way to use the physics engine to detect if
+placing a shape, given a certain position and rotation, would overlap
+with some other physics objects.</p>
+<h2 id="the-solution">The solution</h2>
+<p>I will get straight to the point by giving you the solution I came up
+with:</p>
+<h3 id="get-the-position-you-want-to-place-it-at">Get the position you
+want to place it at</h3>
+<p>This is done by using the algorithm I described in <a href="Destruction">Destruction</a>. I could also use the ray casting
+available in jolt, like in <a href="SelectingEntities">Selecting
+entities</a>.</p>
+<h3 id="apply-vertical-offset-so-that-shape-is-on-the-ground">Apply
+vertical offset so that shape is on the ground</h3>
+<p>The position of the shape is actually its center of mass. So, I need
+a way of getting the offset from the center of mass to the “bottom” of
+the shape. However, I can’t just store it, since rotations would
+invalidade it. To get around this, I get the bounding box of the shape,
+and rotate it:</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp"><span class="hljs-comment">// transform matrix with the rotation</span>
+JPH::Mat44 transform = JPH::Mat44::<span class="hljs-built_in">sRotation</span>(rot);
+
+<span class="hljs-comment">// GetLocalBounds() returns the AABB. transform it with the rotation</span>
+JPH::AABox aabox = insertObj-&gt;phys_shape-&gt;<span class="hljs-built_in">GetLocalBounds</span>().<span class="hljs-built_in">Transformed</span>(transform);</code></pre>
+<p>Now, we can get the distance from the center of mass to the “bottom”
+of the shape</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp"><span class="hljs-type">float</span> offset = insertObj-&gt;phys_shape-&gt;<span class="hljs-built_in">GetCenterOfMass</span>().<span class="hljs-built_in">GetY</span>() - aabox.mMin.<span class="hljs-built_in">GetY</span>();</code></pre>
+<p>By adding this offset to the Y component of the position we want to
+place it at, the bottom of the shape should be at the level of the
+floor.</p>
+<h3 id="check-if-it-can-be-placed">Check if it can be placed</h3>
+<p>First, translate the rotated aabb since I’m going to need it to check
+for collision, and also translate the transform (I have no idea what the
+most efficient way of doing things here is but it should’t matter too
+much):</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp"><span class="hljs-comment">// DO NOT DO THIS, READ WHAT IS BELOW</span>
+aabox.<span class="hljs-built_in">Translate</span>(pos); <span class="hljs-comment">// pos.y has been offset by the offset</span>
+
+transform = transform.<span class="hljs-built_in">PreTranslated</span>(pos);</code></pre>
+<p>Doing this actually “invalidates” the rotation previously applied to
+the aabox, so for now I do</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp">aabox = aabox.<span class="hljs-built_in">Transformed</span>(transform); <span class="hljs-comment">// after transform was translated</span></code></pre>
+<p>Now we can check in the broad phase:</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp">Phys::<span class="hljs-built_in">getBroadPhase</span>().<span class="hljs-built_in">CollideAABox</span>(aabb, collector, broadPhaseFilter, objectFilter);</code></pre>
+<p>And in the narrow phase:</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp">    <span class="hljs-comment">// broad phase collided, so we need to check narrow phase</span>
+    <span class="hljs-keyword">if</span> (collector.collision) {
+        CollideShapeSettings collideSettings; <span class="hljs-comment">// lots of settings here, I use none</span>
+        MyCollideShapeCollector collisionCollector;
+
+        JPH::Vec3 pos = transform.<span class="hljs-built_in">GetTranslation</span>(); <span class="hljs-comment">// you could just pass the translation vector, whatever</span>
+        Phys::<span class="hljs-built_in">getNarrowPhase</span>().<span class="hljs-built_in">CollideShape</span>(
+            shape,
+            scale,
+            transform,
+            collideSettings,
+            pos,
+            collisionCollector
+        );
+
+        res = !collisionCollector.collision;
+    }</code></pre>
+<p>About that last <code>pos</code>, according to the docs: “All hit
+results will be returned relative to this offset, can be zero to get
+results in world position, but when you’re testing far from the origin
+you get better precision by picking a position that’s closer
+e.g.&nbsp;inCenterOfMassTransform.GetTranslation() since floats are most
+accurate near the origin”</p>
+<p>The filters and the collector were not defined so I wouldn’t bloat
+everything, but here are some examples:</p>
+<pre class="cpp"><code data-highlighted="yes" class="hljs language-cpp">    <span class="hljs-keyword">class</span> <span class="hljs-title class_">MyBroadPhaseFilter</span> : <span class="hljs-keyword">public</span> JPH::BroadPhaseLayerFilter {
+    <span class="hljs-keyword">public</span>:
+        <span class="hljs-function"><span class="hljs-keyword">virtual</span> <span class="hljs-type">bool</span> <span class="hljs-title">ShouldCollide</span><span class="hljs-params">(JPH::BroadPhaseLayer inLayer)</span> <span class="hljs-type">const</span> <span class="hljs-keyword">override</span> </span>{
+            <span class="hljs-comment">// just return true meaning all layers can be checked</span>
+            <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+        }
+    };
+
+    <span class="hljs-keyword">class</span> <span class="hljs-title class_">MyObjectFilter</span> : <span class="hljs-keyword">public</span> JPH::ObjectLayerFilter {
+    <span class="hljs-keyword">public</span>:
+        <span class="hljs-function"><span class="hljs-keyword">virtual</span> <span class="hljs-type">bool</span> <span class="hljs-title">ShouldCollide</span><span class="hljs-params">(JPH::ObjectLayer inLayer)</span> <span class="hljs-type">const</span> <span class="hljs-keyword">override</span> </span>{
+            <span class="hljs-comment">// just return true meaning all layers can be checked</span>
+            <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+        }
+    };
+
+    <span class="hljs-comment">// this one does extra work and should "exit" after a single hit is detected, haven't done that yet</span>
+    <span class="hljs-keyword">class</span> <span class="hljs-title class_">MyBodyCollector</span> : <span class="hljs-keyword">public</span> CollideShapeBodyCollector {
+    <span class="hljs-keyword">public</span>:
+        <span class="hljs-type">bool</span> collision = <span class="hljs-literal">false</span>;
+
+        <span class="hljs-comment">// This function is called for each overlapping body</span>
+        <span class="hljs-function"><span class="hljs-keyword">virtual</span> <span class="hljs-type">void</span> <span class="hljs-title">AddHit</span><span class="hljs-params">(<span class="hljs-type">const</span> BodyID &amp;inBodyID)</span> <span class="hljs-keyword">override</span> </span>{
+            <span class="hljs-comment">// a hit was detected</span>
+            collision = <span class="hljs-literal">true</span>;
+        }
+    };
+
+    <span class="hljs-comment">// same as above but for narrow phase, gets a different thing other than just a BodyID</span>
+    <span class="hljs-keyword">class</span> <span class="hljs-title class_">MyCollideShapeCollector</span> : <span class="hljs-keyword">public</span> CollideShapeCollector {
+    <span class="hljs-keyword">public</span>:
+        <span class="hljs-type">bool</span> collision = <span class="hljs-literal">false</span>;
+        <span class="hljs-function"><span class="hljs-keyword">virtual</span> <span class="hljs-type">void</span> <span class="hljs-title">AddHit</span><span class="hljs-params">(<span class="hljs-type">const</span> CollideShapeResult &amp;inResult)</span> <span class="hljs-keyword">override</span> </span>{
+            collision = <span class="hljs-literal">true</span>;
+        }
+    };</code></pre>
+<h2 id="results">Results</h2>
+<video class="border" src="Videos/insert2.mp4" controls="">
+</video>
+<video class="border" src="Videos/insert1.mp4" controls="">
+</video>
+<h2 id="problems">Problems</h2>
+<p>Turns out the bounding box jolt provides is extremely generous. Here
+it is visualized in blender:</p>
+<p><img class="border" src="Pictures/insert1.png">
+<img class="border" src="Pictures/insert2.png">
+<img class="border" src="Pictures/insert3.png"></p>
+<p>Because of this, since I use the bounding box to calculate the height
+offset, entities are inserted pretty far from the floor.</p>
+<p>If this proves to be a problem in the future, I will have to either
+use an oriented box, make the bounding box manually, or some other
+solution. For now, I just kept it as-is.</p>
+  <div class="debug-grid"></div>
+  <script src="scripts/index.js"></script>
+
+<footer>
+</footer>
+
+</body></html>
