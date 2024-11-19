@@ -1,1 +1,167 @@
-<html><head></head><body></body></html>
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+  <meta charset="utf-8">
+  <meta name="generator" content="pandoc">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Marching Cubes devlog</title>
+  <link rel="stylesheet" href="styles/reset.css">
+  <link rel="stylesheet" href="styles/hljs/github-dark.min.css">
+  <link rel="stylesheet" href="styles/index.css">
+</head>
+<body>
+<table class="header">
+  <tbody><tr>
+    <td rowspan="2" class="width-auto">
+      <h1 class="title">Marching Cubes devlog</h1>
+      <span class="subtitle">About</span>
+    </td>
+	<td>
+		<a href="index">Main page</a>
+	</td>
+  </tr>
+  <tr>
+    <td class="width-min">
+		<span style="white-space: pre;">Updated: 9/2024</span>
+	</td>
+  </tr>
+</tbody></table>
+<label class="debug-toggle-label"><input type="checkbox" class="debug-toggle"> Debug mode</label>
+<nav id="TOC" role="doc-toc">
+<!-- <h2 id="toc-title">Contents</h2>
+ -->
+<ul>
+<li><a href="#who">Who</a></li>
+<li><a href="#what-tldr">What (TLDR)</a></li>
+<li><a href="#why">Why</a></li>
+<li><a href="#attribution">Attribution</a></li>
+</ul>
+</nav>
+<h2 id="who">Who</h2>
+<p>Ivan Ribeiro</p>
+<p><a href="https://github.com/IVSOP">https://github.com/IVSOP</a></p>
+<h2 id="what-tldr">What (TLDR)</h2>
+<p>I’m making a game with my own custom engine, and documenting the most
+interesting/useful things I’ve learned</p>
+<p>I’m also going into it blind, never having used a game engine
+before</p>
+<p>I will also share my opinions on the things I use</p>
+<h2 id="why">Why</h2>
+<p>I’ve always had an interest in videogames. I witnessed their
+evolution, and remember being blown away by minecraft, as I could not
+comprehend that a computer could handle an infinite world where you
+could build and destroy anything. Even a lever opening a door raised so
+many questions. How did the game know that this lever should open the
+door? Why does it open instantly and not smoothly? How does anything
+about a game work? How do you make one? I though someday I will be able
+to understand all of this and make my own game, with my own smooth
+doors.</p>
+<p>Recently I’ve done some small projects that enabled me to learn some
+of the required skills. I started by experimenting with C++ and OpenGL,
+learning completely on my own which brought me a lot of pain an
+suffering. I will never forget my first textured quad. Taking
+inspiration from <a href="https://youtu.be/lS_qeBy3aQI">this video</a>,
+I made a <a href="https://github.com/IVSOP/Particles">particle
+simulator</a>, which allowed me to learn some rendering concepts (like
+batching and instancing) and also get comfortable with some optimization
+techniques, like SIMD and spatial partitioning.</p>
+<p>I then made an extremely naive implementation of a minecraft-like
+game, teaching me some 3D skills. It also made me realize how hard it
+must be to make a 3D game, and how performance intensive graphics are
+when not optimized properly.</p>
+<p>In university, I got to do a very simple 3D graphics engine, which
+pushed me to learn many more advanced concepts, like bloom, HDR and
+color correction, rendering models and bezier surfaces, texture buffers,
+framebuffers, blinn-phong lighting, and also learning the actual math
+behind all of these. I just used the 🐐 <a href="https://learnopengl.com/">learnopengl</a> for this.</p>
+<p>Eventually I came accross videos on voxel engines like <a href="https://youtu.be/40JzyaOYJeY">this</a>, <a href="https://youtu.be/qnGoGq7DWMc?">this</a> and <a href="https://youtu.be/NwP2VVnRt3Q">this</a>, which were so impressive
+they re-sparked my interest for minecraft, and how I could make a better
+version of it.</p>
+<p>Recently I’ve graduated in Software Engineering, and felt like I
+finally had the skills to (begin to) tackle this.</p>
+<p>I actually managed to implement the concepts these videos talked
+about, like indirect rendering, many forms of culling, and even made my
+own binary greedy mesher (the one you find online is completely
+unreadable, so I made my own. I regret this, do not try it), which you
+can find <a href="https://github.com/IVSOP/VoxelEngine">here</a>. Still,
+I just felt like something was missing. It wasn’t interesting enough,
+just shaping up to be another minecraft clone.</p>
+<p>Some time ago I had seen some videos on an algorithm(?) called
+marching cubes. The name itself is interesting. Where are they going?
+How does a cube march?</p>
+<p>After some head scratching, watching some videos and borrowing some
+code, I managed to get it to work, and I felt like I had the skills to
+keep going and make a full game out of it. It’s still minecraft-like
+voxels, but it no longer looks like a minecraft clone, and presents many
+different challenges. But this was just the beginning.</p>
+<h2 id="attribution">Attribution</h2>
+<details>
+<summary>
+The monospace web
+</summary>
+<a href="https://github.com/owickstrom/the-monospace-web">https://github.com/owickstrom/the-monospace-web</a>
+<p>
+I started with this as a template for the website, then expanded upon it
+heavily
+</p>
+<h3 class="unlisted unnumbered" id="license">License:</h3>
+<pre><p>Copyright 2024 Oskar Wickström</p>
+<p>Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+“Software”), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:</p>
+<p>The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.</p>
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+<pre></pre></pre></details>
+<details>
+<summary>
+highlight.js
+</summary>
+<a href="https://github.com/highlightjs/highlight.js">https://github.com/highlightjs/highlight.js</a>
+<p>
+Used when generating the pages to highlight code blocks
+</p>
+<h3 class="unlisted unnumbered" id="license-1">License:</h3>
+<pre><p>BSD 3-Clause License</p>
+<p>Copyright (c) 2006, Ivan Sagalaev. All rights reserved.</p>
+<p>Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:</p>
+<ul>
+<li>Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.</li>
+<li>Redistributions in binary form must reproduce the above copyright
+notice, this list of conditions and the following disclaimer in the
+documentation and/or other materials provided with the
+distribution.</li>
+<li>Neither the name of the copyright holder nor the names of its
+contributors may be used to endorse or promote products derived from
+this software without specific prior written permission.</li>
+</ul>
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS
+IS” AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+<pre></pre></pre></details>
+  <div class="debug-grid"></div>
+  <script src="scripts/index.js"></script>
+
+<footer>
+</footer>
+
+</body></html>
