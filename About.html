@@ -29,10 +29,10 @@
 <!-- <h2 id="toc-title">Contents</h2>
  -->
 <ul>
-<li><a href="#who">Who</a></li>
-<li><a href="#what-tldr">What (TLDR)</a></li>
-<li><a href="#why">Why</a></li>
-<li><a href="#attribution">Attribution</a></li>
+<li><a href="#who" id="toc-who">Who</a></li>
+<li><a href="#what-tldr" id="toc-what-tldr">What (TLDR)</a></li>
+<li><a href="#why" id="toc-why">Why</a></li>
+<li><a href="#attribution" id="toc-attribution">Attribution</a></li>
 </ul>
 </nav>
 <h2 id="who">Who</h2>
@@ -45,15 +45,13 @@ interesting/useful things I’ve learned</p>
 before</p>
 <p>I will also share my opinions on the things I use</p>
 <h2 id="why">Why</h2>
-<p>I’ve always had an interest in videogames. I witnessed their
-evolution, and remember being blown away by minecraft, as I could not
-comprehend that a computer could handle an infinite world where you
-could build and destroy anything. Even a lever opening a door raised so
-many questions. How did the game know that this lever should open the
-door? Why does it open instantly and not smoothly? How does anything
-about a game work? How do you make one? I though someday I will be able
-to understand all of this and make my own game, with my own smooth
-doors.</p>
+<!-- I've always had an interest in videogames. I witnessed their evolution, and remember being blown away by minecraft, -->
+<!-- as I could not comprehend that a computer could handle an infinite world where you could build and destroy anything. -->
+<!-- Even a lever opening a door raised so many questions. How did the game know that this lever should open the door? -->
+<!-- Why does it open instantly and not smoothly? How does anything about a game work? How do you make one? -->
+<!-- I though someday I will be able to understand all of this and make my own game, with my own smooth doors. -->
+<p>I’ve always been interested in how games are made and how the engines
+work under the hood.</p>
 <p>Recently I’ve done some small projects that enabled me to learn some
 of the required skills. I started by experimenting with C++ and OpenGL,
 learning completely on my own which brought me a lot of pain an
@@ -63,11 +61,9 @@ I made a <a href="https://github.com/IVSOP/Particles">particle
 simulator</a>, which allowed me to learn some rendering concepts (like
 batching and instancing) and also get comfortable with some optimization
 techniques, like SIMD and spatial partitioning.</p>
-<p>I then made an extremely naive implementation of a minecraft-like
-game, teaching me some 3D skills. It also made me realize how much goes
-into a 3D engine, and how performance intensive 3D graphics are when not
-optimized properly.</p>
-<p>At university, I got to do a very simple 3D graphics engine, which
+<!-- I then made an extremely naive implementation of a minecraft-like game, teaching me some 3D skills. It also made me realize -->
+<!-- how hard it must be to make a 3D game, and how performance intensive graphics are when not optimized properly. -->
+<p>In university, I got to do a very simple 3D graphics engine, which
 pushed me to learn many more advanced concepts, like bloom, HDR and
 color correction, rendering models and bezier surfaces, texture buffers,
 framebuffers, blinn-phong lighting, and also learning the actual math
@@ -85,8 +81,8 @@ can find <a href="https://github.com/IVSOP/VoxelEngine">here</a>. Still,
 I just felt like something was missing. It wasn’t interesting enough,
 just shaping up to be another minecraft clone.</p>
 <p>Some time ago I had seen some videos on an algorithm(?) called
-marching cubes. The name itself is interesting. Where are they going?
-How does a cube march?</p>
+marching cubes. The name itself is interesting. How does a cube
+march?</p>
 <p>After some head scratching, watching some videos and borrowing some
 code, I managed to get it to work, and I felt like I had the skills to
 keep going and make a full game out of it. It’s still minecraft-like
